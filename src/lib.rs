@@ -665,7 +665,10 @@ impl InflateStream {
                         match block_type {
                             0 => {
                                 // Skip to the next byte for an uncompressed block.
-                                stream.state = BitState { n: 0, v: 0 };
+                                let nbits = stream.state.n;
+                                if nbits > 0 {
+                                  let _ = take!(nbits % 8);
+                                }
                                 ok!(BlockUncompressed)
                             }
                             1 => {
@@ -710,7 +713,7 @@ impl InflateStream {
                         let nlen = take16!(16);
                         assert_eq!(stream.state.n, 0);
                         if !len != nlen {
-                            return Err("invalid uncompressed block len".to_owned())
+                            return Err(format!("invalid uncompressed block len: LEN: {:04x} NLEN: {:04x}", len, nlen))
                         }
                         ok_state!(Uncompressed(len))
                     }
