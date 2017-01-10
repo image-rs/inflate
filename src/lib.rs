@@ -7,7 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! An [DEFLATE](http://www.gzip.org/zlib/rfc-deflate.html) decoder written in rust.
+//! A [DEFLATE](http://www.gzip.org/zlib/rfc-deflate.html) decoder written in rust.
 //!
 //! This library provides functionality to decompress data compressed with the DEFLATE algorithm,
 //! both with and without a [zlib](https://tools.ietf.org/html/rfc1950) header/trailer.
@@ -509,7 +509,7 @@ impl CodeLengthReader {
         Ok(true)
     }
 
-    fn to_lit_and_dist(self) -> Result<(DynHuffman16, DynHuffman16), String> {
+    fn to_lit_and_dist(&self) -> Result<(DynHuffman16, DynHuffman16), String> {
         let num_lit = self.num_lit as usize;
         let lit = try!(DynHuffman16::new(&self.result[..num_lit]));
         let dist = try!(DynHuffman16::new(&self.result[num_lit..]));
@@ -818,11 +818,8 @@ impl InflateStream {
         macro_rules! run_len_dist (($len:expr, $dist:expr => ($bytes:expr, $next:expr, $state:expr)) => ({
             let dist = $dist;
             let left = try!(self.run_len_dist($len, dist));
-            match left {
-                Some(len) => {
-                    return ok_bytes!($bytes, LenDist(($next, $state), len, dist));
-                }
-                None => {}
+            if let Some(len) = left {
+                return ok_bytes!($bytes, LenDist(($next, $state), len, dist));
             }
         }));
         match self.state.take().unwrap() {
