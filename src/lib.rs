@@ -36,6 +36,8 @@
 use std::cmp;
 use std::slice;
 
+pub mod writer;
+
 static BIT_REV_U8: [u8; 256] = [
     0b0000_0000, 0b1000_0000, 0b0100_0000, 0b1100_0000,
     0b0010_0000, 0b1010_0000, 0b0110_0000, 0b1110_0000,
