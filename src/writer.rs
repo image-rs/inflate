@@ -2,6 +2,23 @@ use std::io::{Write, Error, ErrorKind};
 use std::io;
 use InflateStream;
 
+/// A DEFLATE decoder.
+///
+/// A struct implementing the `std::io::Write` trait that decompresses DEFLATE
+/// encoded data into the given writer `w`.
+///
+/// # Example
+///
+/// ```
+/// use inflate::writer::InflateWriter;
+/// use std::io::Write;
+///
+/// let encoded = [243, 72, 205, 201, 201, 215, 81, 40, 207, 47, 202, 73, 1, 0];
+/// let mut decoder = InflateWriter::new(Vec::new());
+/// decoder.write(&encoded).unwrap();
+/// let decoded = decoder.finish().unwrap();
+/// println!("{}", std::str::from_utf8(&decoded).unwrap()); // prints "Hello, world"
+/// ```
 pub struct InflateWriter<W: Write> {
     inflater: InflateStream,
     writer: W
