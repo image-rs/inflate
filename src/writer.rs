@@ -47,7 +47,7 @@ impl<W: Write> Write for InflateWriter<W> {
         while n < buf.len() {
             let (num_bytes_read, result) = try!(update(&mut self.inflater, &buf[n..]));
             n += num_bytes_read;
-            self.writer.write(result)?;
+            try!(self.writer.write(result));
         }
         Ok(n)
     }
