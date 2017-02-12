@@ -2,7 +2,7 @@
 ///
 /// # Example
 /// ```
-/// use inflate::utils::inflate_bytes;
+/// use inflate::inflate_bytes;
 /// use std::str::from_utf8;
 ///
 /// let encoded = [243, 72, 205, 201, 201, 215, 81, 40, 207, 47, 202, 73, 1, 0];
