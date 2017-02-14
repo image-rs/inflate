@@ -58,7 +58,7 @@
 //!     let res = inflater.update(&data[n..]);
 //!     if let Ok((num_bytes_read, result)) = res {
 //!         n += num_bytes_read;
-//!         out.extend(result);
+//!         out.extend(result.iter().map(|v| *v));
 //!     } else {
 //!         res.unwrap();
 //!     }
