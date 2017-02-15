@@ -10,7 +10,7 @@ use InflateStream;
 /// # Example
 ///
 /// ```
-/// use inflate::writer::InflateWriter;
+/// use inflate::InflateWriter;
 /// use std::io::Write;
 ///
 /// let encoded = [243, 72, 205, 201, 201, 215, 81, 40, 207, 47, 202, 73, 1, 0];
