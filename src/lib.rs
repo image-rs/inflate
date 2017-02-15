@@ -36,7 +36,8 @@
 use std::cmp;
 use std::slice;
 
-pub mod writer;
+mod writer;
+pub use self::writer::{InflateWriter};
 
 mod utils;
 pub use self::utils::{inflate_bytes, inflate_bytes_zlib};
