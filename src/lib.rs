@@ -32,7 +32,7 @@
 //! `inflate::writer::InflateWriter` to decode the DEFLATE encoded string "Hello, world":
 //!
 //! ```rust
-//! use inflate::writer::InflateWriter;
+//! use inflate::InflateWriter;
 //! use std::io::Write;
 //! use std::str::from_utf8;
 //!
