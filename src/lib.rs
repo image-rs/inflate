@@ -272,7 +272,13 @@ macro_rules! with_codes (($clens:expr, $max_bits:expr => $code_ty:ty, $cb:expr) 
     for (i, &bits) in $clens.iter().enumerate() {
         if bits != 0 {
             let code = next_code[bits as usize];
-            next_code[bits as usize] += 1;
+            // If there is an overflow here, the given set of code lengths won't allow enough
+            // unique codes to be generated.
+            let new_code = try!(
+                code.checked_add(1)
+                    .ok_or_else(|| "Error generating huffman codes: Invalid set of code lengths!")
+            );
+            next_code[bits as usize] = new_code;
             match $cb(i as $code_ty, code, bits) {
                 Ok(()) => (),
                 Err(err) => return Err(err)
