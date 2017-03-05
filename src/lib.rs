@@ -252,23 +252,38 @@ impl<'a> BitStream<'a> {
     }
 }
 
+/// Generate huffman codes from the given set of lengths and run `$cb` on them except the first
+/// code for each length.
+///
+/// See also the [deflate specification](http://www.gzip.org/zlib/rfc-deflate.html#huffman)
+/// for an explanation of the algorithm.
 macro_rules! with_codes (($clens:expr, $max_bits:expr => $code_ty:ty, $cb:expr) => ({
     // Count the number of codes for each bit length.
     let mut bl_count = [0 as $code_ty; ($max_bits+1)];
     for &bits in $clens.iter() {
         if bits != 0 {
+            // This should be safe from overflow as the number of lengths read from the input
+            // is bounded by the number of bits the number of lengths is represented by in the
+            // deflate compressed data.
             bl_count[bits as usize] += 1;
         }
     }
 
     // Compute the first code value for each bit length.
     let mut next_code = [0 as $code_ty; ($max_bits+1)];
+    let mut code = 0 as $code_ty;
     // TODO use range_inclusive as soon as it is stable
     //for bits in range_inclusive(1, $max_bits) {
     for bits in 1..$max_bits + 1 {
-        next_code[bits as usize] = (next_code[bits as usize - 1] + bl_count[bits as usize - 1]) << 1;
+        code =
+            try!(
+                code.checked_add(bl_count[bits as usize - 1])
+                    .ok_or_else(|| "Error generating huffman codes: Invalid set of code lengths")
+            ) << 1;
+        next_code[bits as usize] = code;
     }
 
+    // Compute the rest of the codes
     for (i, &bits) in $clens.iter().enumerate() {
         if bits != 0 {
             let code = next_code[bits as usize];
