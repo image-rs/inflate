@@ -276,8 +276,7 @@ macro_rules! with_codes (($clens:expr, $max_bits:expr => $code_ty:ty, $cb:expr) 
     //for bits in range_inclusive(1, $max_bits) {
     for bits in 1..$max_bits + 1 {
         code =
-            try!(
-                code.checked_add(bl_count[bits as usize - 1])
+            try!(code.checked_add(bl_count[bits as usize - 1])
                     .ok_or_else(|| "Error generating huffman codes: Invalid set of code lengths")
             ) << 1;
         next_code[bits as usize] = code;
