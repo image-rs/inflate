@@ -75,6 +75,9 @@ pub use self::writer::{InflateWriter};
 mod utils;
 pub use self::utils::{inflate_bytes, inflate_bytes_zlib};
 
+mod reader;
+pub use self::reader::{DeflateDecoder, DeflateDecoderBuf};
+
 static BIT_REV_U8: [u8; 256] = [
     0b0000_0000, 0b1000_0000, 0b0100_0000, 0b1100_0000,
     0b0010_0000, 0b1010_0000, 0b0110_0000, 0b1110_0000,
@@ -557,6 +560,18 @@ impl InflateStream {
     /// Create a new stream for decoding deflate encoded data with a zlib header and footer
     pub fn from_zlib() -> InflateStream {
         InflateStream::with_state_and_buffer(ZlibMethodAndFlags, Vec::new())
+    }
+
+    pub fn reset(&mut self) {
+        self.buffer.clear();
+        self.pos = 0;
+        self.state = Some(Bits(BlockHeader, BitState { n: 0, v: 0 }));
+        self.final_block = false;
+    }
+
+    pub fn reset_to_zlib(&mut self) {
+        self.reset();
+        self.state = Some(ZlibMethodAndFlags);
     }
 
     fn with_state_and_buffer(state: State, buffer: Vec<u8>) -> InflateStream {
