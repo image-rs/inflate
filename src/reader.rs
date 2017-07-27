@@ -1,12 +1,18 @@
-use std::io::{BufRead, Read, BufReader, self, Error, ErrorKind};
+use std::io::{self, BufRead, Read, BufReader, Error, ErrorKind, Write};
 use std::{cmp,mem};
 
 use super::InflateStream;
 
+/// Workaround for lack of copy_from_slice on pre-1.9 rust.
+fn copy_from_slice(mut to: &mut [u8], from: &[u8]) {
+    assert_eq!(to.len(), from.len());
+    to.write_all(from).unwrap();
+}
+
 /// A DEFLATE decoder/decompressor.
 ///
-/// This structuree implements a `BufRead` interface and takes a stream of compressed data as input,
-/// provoding the decompressed data when read from.
+/// This structure implements a `Read` interface and takes a stream of compressed data as input,
+/// providing the decompressed data when read from.
 pub struct DeflateDecoderBuf<R> {
     /// The inner reader instance
     reader: R,
@@ -25,6 +31,16 @@ impl<R: BufRead> DeflateDecoderBuf<R> {
         DeflateDecoderBuf {
             reader: reader,
             decompressor: InflateStream::new(),
+            pending_output_bytes: 0,
+            total_in: 0,
+            total_out: 0,
+        }
+    }
+
+    pub fn from_zlib(reader: R) -> DeflateDecoderBuf<R> {
+        DeflateDecoderBuf {
+            reader: reader,
+            decompressor: InflateStream::from_zlib(),
             pending_output_bytes: 0,
             total_in: 0,
             total_out: 0,
@@ -100,7 +116,7 @@ impl<R: BufRead> Read for DeflateDecoderBuf<R> {
             let pending_data =
                 &self.decompressor.buffer[start..
                                           start + bytes_to_copy];
-            buf[..bytes_to_copy].copy_from_slice(pending_data);
+            copy_from_slice(&mut buf[..bytes_to_copy],pending_data);
             bytes_out += bytes_to_copy;
             // This won't underflow since `bytes_to_copy` will be at most
             // the same value as `pending_output_bytes`.
@@ -131,7 +147,8 @@ impl<R: BufRead> Read for DeflateDecoderBuf<R> {
             // Space left in `buf`
             let space_left = buf.len() - bytes_out;
             let bytes_to_copy = cmp::min(space_left, data.len());
-            buf[bytes_out..bytes_out + bytes_to_copy].copy_from_slice(&data[..bytes_to_copy]);
+
+            copy_from_slice(&mut buf[bytes_out..bytes_out + bytes_to_copy], &data[..bytes_to_copy]);
 
             bytes_out += bytes_to_copy;
 
@@ -153,7 +170,7 @@ impl<R: BufRead> Read for DeflateDecoderBuf<R> {
 
 /// A DEFLATE decoder/decompressor.
 ///
-/// This structuree implements a `Read` interface and takes a stream of compressed data as input,
+/// This structure implements a `Read` interface and takes a stream of compressed data as input,
 /// provoding the decompressed data when read from.
 pub struct DeflateDecoder<R> {
     /// Inner DeflateDecoderBuf, with R wrapped in a `BufReader`.
@@ -164,6 +181,12 @@ impl<R: Read> DeflateDecoder<R> {
     pub fn new(reader: R) -> DeflateDecoder<R> {
         DeflateDecoder {
             inner: DeflateDecoderBuf::new(BufReader::new(reader))
+        }
+    }
+
+    pub fn from_zlib(reader: R) -> DeflateDecoder<R> {
+        DeflateDecoder {
+            inner: DeflateDecoderBuf::from_zlib(BufReader::new(reader))
         }
     }
 
@@ -213,7 +236,7 @@ impl<R> DeflateDecoder<R> {
     }
 }
 
-impl<R: BufRead> Read for DeflateDecoder<R> {
+impl<R: Read> Read for DeflateDecoder<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf)
     }
@@ -222,13 +245,30 @@ impl<R: BufRead> Read for DeflateDecoder<R> {
 #[cfg(test)]
 mod test {
     use super::{DeflateDecoder};
+    use std::io::Read;
 
     #[test]
     fn deflate_reader() {
+        const TEST_STRING: &'static str = "Hello, world";
         let encoded = vec![243, 72, 205, 201, 201, 215, 81, 40, 207, 47, 202, 73, 1, 0];
-        let mut decoder = DeflateDecoder::new(encoded.as_slice());
+        let mut decoder = DeflateDecoder::new(&encoded[..]);
         let mut output = Vec::new();
         decoder.read_to_end(&mut output).unwrap();
-        assert_eq!(String::from_utf8(output).unwrap(), "Hello, world");
+        assert_eq!(String::from_utf8(output).unwrap(), TEST_STRING);
+        assert_eq!(decoder.total_in(), encoded.len() as u64);
+        assert_eq!(decoder.total_out(), TEST_STRING.len() as u64);
+    }
+
+    #[test]
+    fn zlib_reader() {
+        const TEST_STRING: &'static str = "Hello, zlib!";
+        let encoded = vec![120, 156, 243, 72, 205, 201, 201, 215, 81, 168, 202, 201,
+                       76, 82, 4, 0, 27, 101, 4, 19];
+        let mut decoder = DeflateDecoder::from_zlib(&encoded[..]);
+        let mut output = Vec::new();
+        decoder.read_to_end(&mut output).unwrap();
+        assert_eq!(String::from_utf8(output).unwrap(), TEST_STRING);
+        assert_eq!(decoder.total_in(), encoded.len() as u64);
+        assert_eq!(decoder.total_out(), TEST_STRING.len() as u64);
     }
 }
