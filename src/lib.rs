@@ -66,14 +66,20 @@
 //! ```
 
 #![cfg_attr(feature = "unstable", feature(core))]
+
+extern crate adler32;
+
 use std::cmp;
 use std::slice;
+
+mod checksum;
+use checksum::{Checksum, adler32_from_bytes};
 
 mod writer;
 pub use self::writer::{InflateWriter};
 
 mod utils;
-pub use self::utils::{inflate_bytes, inflate_bytes_zlib};
+pub use self::utils::{inflate_bytes, inflate_bytes_zlib, inflate_bytes_zlib_no_checksum};
 
 mod reader;
 pub use self::reader::{DeflateDecoder, DeflateDecoderBuf};
@@ -546,6 +552,8 @@ pub struct InflateStream {
     pos: u16,
     state: Option<State>,
     final_block: bool,
+    checksum: Checksum,
+    read_checksum: Option<u32>,
 }
 
 impl InflateStream {
@@ -554,12 +562,20 @@ impl InflateStream {
     pub fn new() -> InflateStream {
         let state = Bits(BlockHeader, BitState { n: 0, v: 0 });
         let buffer = Vec::with_capacity(32 * 1024);
-        InflateStream::with_state_and_buffer(state, buffer)
+        InflateStream::with_state_and_buffer(state, buffer, Checksum::none())
     }
 
     /// Create a new stream for decoding deflate encoded data with a zlib header and footer
     pub fn from_zlib() -> InflateStream {
-        InflateStream::with_state_and_buffer(ZlibMethodAndFlags, Vec::new())
+        InflateStream::with_state_and_buffer(ZlibMethodAndFlags, Vec::new(), Checksum::zlib())
+    }
+
+    /// Create a new stream for decoding deflate encoded data with a zlib header and footer
+    ///
+    /// This version creates a decoder that does not checksum the data to validate it with the
+    /// checksum provided with the zlib wrapper.
+    pub fn from_zlib_no_checksum() -> InflateStream {
+        InflateStream::with_state_and_buffer(ZlibMethodAndFlags, Vec::new(), Checksum::none())
     }
 
     pub fn reset(&mut self) {
@@ -574,12 +590,15 @@ impl InflateStream {
         self.state = Some(ZlibMethodAndFlags);
     }
 
-    fn with_state_and_buffer(state: State, buffer: Vec<u8>) -> InflateStream {
+    fn with_state_and_buffer(state: State, buffer: Vec<u8>, checksum: Checksum)
+                             -> InflateStream {
         InflateStream {
             buffer: buffer,
             pos: 0,
             state: Some(state),
             final_block: false,
+            checksum: checksum,
+            read_checksum: None,
         }
     }
 
@@ -1042,9 +1061,11 @@ impl InflateStream {
                 ok_bytes!(data.len(), Uncompressed(len))
             }
             CheckCRC => {
-                let _b = data[0];
-                debug!("CRC {:02x}", _b);
-                ok_bytes!(1, CheckCRC)
+                // Get the checksum value from the end of the stream.
+                self.read_checksum = Some(adler32_from_bytes(data));
+
+                // The checksum is a 32-bit value, aka 4 bytes long.
+                ok_bytes!(4, CheckCRC)
             }
         }
     }
@@ -1056,7 +1077,8 @@ impl InflateStream {
     ///
     /// This function may not uncompress all the provided data in one call, so it has to be called
     /// repeatedly with the data that hasn't been decompressed yet as an input until the number of
-    /// bytes decoded returned is 0. (See the [top level crate documentation](index.html) for an example.)
+    /// bytes decoded returned is 0. (See the [top level crate documentation](index.html)
+    /// for an example.)
     ///
     /// # Errors
     /// If invalid input data is encountered, a string describing what went wrong is returned.
@@ -1076,6 +1098,21 @@ impl InflateStream {
         if self.pos as usize >= self.buffer.capacity() {
             self.pos = 0;
         }
+
+        // Update the checksum..
+        self.checksum.update(output);
+        // and validate if we are done decoding.
+        if let Some(c) = self.read_checksum {
+            try!(self.checksum.check(c));
+        }
+
         Ok((original_size - data.len(), output))
+    }
+
+    /// Returns the calculated checksum value of the currently decoded data.
+    ///
+    /// Will return 0 for cases where the checksum is not validated.
+    pub fn current_checksum(&self) -> u32 {
+        self.checksum.current_value()
     }
 }

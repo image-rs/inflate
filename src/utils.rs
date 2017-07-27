@@ -39,6 +39,14 @@ pub fn inflate_bytes_zlib(data: &[u8]) -> Result<Vec<u8>, String> {
     inflate(&mut InflateStream::from_zlib(), data)
 }
 
+/// Decompress the given slice of DEFLATE compressed (with zlib headers and trailers) data,
+/// without calculating and validating the checksum.
+///
+/// Returns a `Vec` with the decompressed data or an error message.
+pub fn inflate_bytes_zlib_no_checksum(data: &[u8]) -> Result<Vec<u8>, String> {
+    inflate(&mut InflateStream::from_zlib_no_checksum(), data)
+}
+
 #[cfg(test)]
 mod test {
     #[test]
@@ -46,8 +54,20 @@ mod test {
         use super::inflate_bytes_zlib;
         use std::str::from_utf8;
 
-        let encoded = [120, 156, 243, 72, 205, 201, 201, 215, 81, 168, 202, 201, 76, 82, 4, 0, 27, 101, 4, 19];
+        let encoded = [120, 156, 243, 72, 205, 201, 201, 215, 81, 168, 202, 201,
+                       76, 82, 4, 0, 27, 101, 4, 19];
         let decoded = inflate_bytes_zlib(&encoded).unwrap();
         assert!(from_utf8(&decoded).unwrap() == "Hello, zlib!");
+    }
+
+    #[test]
+    fn inflate_bytes_with_zlib_checksum_fail() {
+        use super::inflate_bytes_zlib;
+
+        // The last 4 bytes are the checksum, we set them to 0 here to check that decoding fails
+        // if the checksum is wrong.
+        let encoded = [120, 156, 243, 72, 205, 201, 201, 215, 81, 168, 202, 201,
+                       76, 82, 4, 0, 0, 0, 0, 0];
+        inflate_bytes_zlib(&encoded).unwrap_err();
     }
 }

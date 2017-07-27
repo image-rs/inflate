@@ -11,8 +11,23 @@ fn copy_from_slice(mut to: &mut [u8], from: &[u8]) {
 
 /// A DEFLATE decoder/decompressor.
 ///
-/// This structure implements a `Read` interface and takes a stream of compressed data as input,
+/// This structure implements a `Read` interface and takes a stream
+/// of compressed data that implements the `BufRead` trait as input,
 /// providing the decompressed data when read from.
+///
+/// # Example
+/// ```
+/// use std::io::Read;
+/// use inflate::DeflateDecoderBuf;
+///
+/// const TEST_STRING: &'static str = "Hello, world";
+/// let encoded = vec![243, 72, 205, 201, 201, 215, 81, 40, 207, 47, 202, 73, 1, 0];
+/// let mut decoder = DeflateDecoderBuf::new(&encoded[..]);
+/// let mut output = Vec::new();
+/// let status = decoder.read_to_end(&mut output);
+/// # let _ = status;
+/// assert_eq!(String::from_utf8(output).unwrap(), TEST_STRING);
+/// ```
 pub struct DeflateDecoderBuf<R> {
     /// The inner reader instance
     reader: R,
@@ -27,6 +42,7 @@ pub struct DeflateDecoderBuf<R> {
 }
 
 impl<R: BufRead> DeflateDecoderBuf<R> {
+    /// Create a new `Deflatedecoderbuf` to read from a raw deflate stream.
     pub fn new(reader: R) -> DeflateDecoderBuf<R> {
         DeflateDecoderBuf {
             reader: reader,
@@ -37,10 +53,23 @@ impl<R: BufRead> DeflateDecoderBuf<R> {
         }
     }
 
+    /// Create a new `DeflateDecoderbuf` that reads from a zlib wrapped deflate stream.
     pub fn from_zlib(reader: R) -> DeflateDecoderBuf<R> {
         DeflateDecoderBuf {
             reader: reader,
             decompressor: InflateStream::from_zlib(),
+            pending_output_bytes: 0,
+            total_in: 0,
+            total_out: 0,
+        }
+    }
+
+    /// Create a new `DeflateDecoderbuf` that reads from a zlib wrapped deflate stream.
+    /// without calculating and validating the checksum.
+    pub fn from_zlib_no_checksum(reader: R) -> DeflateDecoderBuf<R> {
+        DeflateDecoderBuf {
+            reader: reader,
+            decompressor: InflateStream::from_zlib_no_checksum(),
             pending_output_bytes: 0,
             total_in: 0,
             total_out: 0,
@@ -93,6 +122,13 @@ impl<R> DeflateDecoderBuf<R> {
     /// Returns the total number of bytes output from this decoder.
     pub fn total_out(&self) -> u64 {
         self.total_out
+    }
+
+    /// Returns the calculated checksum value of the currently decoded data.
+    ///
+    /// Will return 0 for cases where the checksum is not validated.
+    pub fn current_checksum(&self) -> u32 {
+        self.decompressor.current_checksum()
     }
 }
 
@@ -170,23 +206,46 @@ impl<R: BufRead> Read for DeflateDecoderBuf<R> {
 
 /// A DEFLATE decoder/decompressor.
 ///
-/// This structure implements a `Read` interface and takes a stream of compressed data as input,
+/// This structure implements a `Read` interface and takes a stream of compressed data that
+/// implements the `Read` trait as input,
 /// provoding the decompressed data when read from.
+/// # Example
+/// ```
+/// use std::io::Read;
+/// use inflate::DeflateDecoder;
+/// const TEST_STRING: &'static str = "Hello, world";
+/// let encoded = vec![243, 72, 205, 201, 201, 215, 81, 40, 207, 47, 202, 73, 1, 0];
+/// let mut decoder = DeflateDecoder::new(&encoded[..]);
+/// let mut output = Vec::new();
+/// let status = decoder.read_to_end(&mut output);
+/// # let _ = status;
+/// assert_eq!(String::from_utf8(output).unwrap(), TEST_STRING);
+/// ```
 pub struct DeflateDecoder<R> {
     /// Inner DeflateDecoderBuf, with R wrapped in a `BufReader`.
     inner: DeflateDecoderBuf<BufReader<R>>
 }
 
 impl<R: Read> DeflateDecoder<R> {
+    /// Create a new `Deflatedecoderbuf` to read from a raw deflate stream.
     pub fn new(reader: R) -> DeflateDecoder<R> {
         DeflateDecoder {
             inner: DeflateDecoderBuf::new(BufReader::new(reader))
         }
     }
 
+    /// Create a new `DeflateDecoderbuf` that reads from a zlib wrapped deflate stream.
     pub fn from_zlib(reader: R) -> DeflateDecoder<R> {
         DeflateDecoder {
             inner: DeflateDecoderBuf::from_zlib(BufReader::new(reader))
+        }
+    }
+
+    /// Create a new `DeflateDecoderbuf` that reads from a zlib wrapped deflate stream.
+    /// without calculating and validating the checksum.
+    pub fn from_zlib_no_checksum(reader: R) -> DeflateDecoder<R> {
+        DeflateDecoder {
+            inner: DeflateDecoderBuf::from_zlib_no_checksum(BufReader::new(reader))
         }
     }
 
@@ -233,6 +292,13 @@ impl<R> DeflateDecoder<R> {
     /// Returns the total number of bytes output from this decoder.
     pub fn total_out(&self) -> u64 {
         self.inner.total_out
+    }
+
+    /// Returns the calculated checksum value of the currently decoded data.
+    ///
+    /// Will return 0 for cases where the checksum is not validated.
+    pub fn current_checksum(&self) -> u32 {
+        self.inner.current_checksum()
     }
 }
 
