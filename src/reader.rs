@@ -4,6 +4,7 @@ use std::{cmp,mem};
 use super::InflateStream;
 
 /// Workaround for lack of copy_from_slice on pre-1.9 rust.
+#[inline]
 fn copy_from_slice(mut to: &mut [u8], from: &[u8]) {
     assert_eq!(to.len(), from.len());
     to.write_all(from).unwrap();
@@ -82,6 +83,7 @@ impl<R> DeflateDecoderBuf<R> {
     /// without doing any extra reallocations.
     ///
     /// Note that this function doesn't ensure that all data has been output.
+    #[inline]
     pub fn reset(&mut self, r: R) -> R {
         self.decompressor.reset();
         mem::replace(&mut self.reader, r)
@@ -90,11 +92,13 @@ impl<R> DeflateDecoderBuf<R> {
     /// Resets the decoder, but continue to read from the same reader.
     ///
     /// Note that this function doesn't ensure that all data has been output.
+    #[inline]
     pub fn reset_data(&mut self) {
         self.decompressor.reset()
     }
 
     /// Returns a reference to the underlying `BufRead` instance.
+    #[inline]
     pub fn get_ref(&self) -> &R {
         &self.reader
     }
@@ -103,6 +107,7 @@ impl<R> DeflateDecoderBuf<R> {
     ///
     /// Note that mutation of the reader may cause surprising results if the decoder is going to
     /// keep being used.
+    #[inline]
     pub fn get_mut(&mut self) -> &mut R {
         &mut self.reader
     }
@@ -110,16 +115,19 @@ impl<R> DeflateDecoderBuf<R> {
     /// Drops the decoder and return the inner `BufRead` instance.
     ///
     /// Note that this function doesn't ensure that all data has been output.
+    #[inline]
     pub fn into_inner(self) -> R {
         self.reader
     }
 
     /// Returns the total bytes read from the underlying `BufRead` instance.
+    #[inline]
     pub fn total_in(&self) -> u64 {
         self.total_in
     }
 
     /// Returns the total number of bytes output from this decoder.
+    #[inline]
     pub fn total_out(&self) -> u64 {
         self.total_out
     }
@@ -127,6 +135,7 @@ impl<R> DeflateDecoderBuf<R> {
     /// Returns the calculated checksum value of the currently decoded data.
     ///
     /// Will return 0 for cases where the checksum is not validated.
+    #[inline]
     pub fn current_checksum(&self) -> u32 {
         self.decompressor.current_checksum()
     }
@@ -253,11 +262,13 @@ impl<R: Read> DeflateDecoder<R> {
     /// without doing any extra reallocations.
     ///
     /// Note that this function doesn't ensure that all data has been output.
+    #[inline]
     pub fn reset(&mut self, r: R) -> R {
         self.inner.reset(BufReader::new(r)).into_inner()
     }
 
     /// Returns a reference to the underlying reader.
+    #[inline]
     pub fn get_ref(&self) -> &R {
         self.inner.get_ref().get_ref()
     }
@@ -266,11 +277,13 @@ impl<R: Read> DeflateDecoder<R> {
     ///
     /// Note that mutation of the reader may cause surprising results if the decoder is going to
     /// keep being used.
+    #[inline]
     pub fn get_mut(&mut self) -> &mut R {
         self.inner.get_mut().get_mut()
     }
 
     /// Returns the total number of bytes output from this decoder.
+    #[inline]
     pub fn into_inner(self) -> R {
         self.inner.into_inner().into_inner()
     }
@@ -280,16 +293,19 @@ impl<R> DeflateDecoder<R> {
     /// Resets the decoder, but continue to read from the same reader.
     ///
     /// Note that this function doesn't ensure that all data has been output.
+    #[inline]
     pub fn reset_data(&mut self) {
         self.inner.reset_data()
     }
 
     /// Returns the total bytes read from the underlying reader.
+    #[inline]
     pub fn total_in(&self) -> u64 {
         self.inner.total_in
     }
 
     /// Returns the total number of bytes output from this decoder.
+    #[inline]
     pub fn total_out(&self) -> u64 {
         self.inner.total_out
     }
@@ -297,12 +313,14 @@ impl<R> DeflateDecoder<R> {
     /// Returns the calculated checksum value of the currently decoded data.
     ///
     /// Will return 0 for cases where the checksum is not validated.
+    #[inline]
     pub fn current_checksum(&self) -> u32 {
         self.inner.current_checksum()
     }
 }
 
 impl<R: Read> Read for DeflateDecoder<R> {
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf)
     }

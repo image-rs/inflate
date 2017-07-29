@@ -40,12 +40,11 @@ impl Checksum {
         }
     }
 
+    #[inline]
     pub fn update(&mut self, bytes: &[u8]) {
-        println!("Updating adler..");
         match self.checksum_type {
             ChecksumType::None => (),
             ChecksumType::Adler32(ref mut c) => {
-                println!("Checksummed {} bytes.", bytes.len());
                 c.update_buffer(bytes);
             }
         }
