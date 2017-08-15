@@ -10,3 +10,6 @@ keywords = ["deflate", "decompression", "compression", "piston"]
 [features]
 default = []
 unstable = []
+
+[dependencies]
+adler32 = "1.0.0"
