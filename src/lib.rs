@@ -1061,6 +1061,9 @@ impl InflateStream {
                 ok_bytes!(data.len(), Uncompressed(len))
             }
             CheckCRC => {
+                if data.len() < 4 {
+                    return Err("data stream ends without a checksum".into());
+                }
                 // Get the checksum value from the end of the stream.
                 self.read_checksum = Some(adler32_from_bytes(data));
 
