@@ -36,3 +36,12 @@ fn issue_17() {
     let res = stream.update(data);
     assert!(res.is_err());
 }
+
+#[test]
+// no checksum present at the end of the data stream (cargo-fuzz test-case)
+fn no_checksum() {
+    let data = b"\x13\xff\xed\xff\xff\x12\xbfM\x00\x00\x00\x00\xd1";
+    let mut stream = inflate::InflateStream::new();
+    let res = stream.update(data);
+    assert!(res.is_err());
+}
