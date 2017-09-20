@@ -1,7 +1,6 @@
 use adler32::RollingAdler32;
 
-pub fn adler32_from_bytes(bytes: &[u8]) -> u32 {
-    assert!(bytes.len() >= 4);
+pub fn adler32_from_bytes(bytes: &[u8; 4]) -> u32 {
     let val: u32 = (bytes[0] as u32) | ((bytes[1] as u32) << 8) |
        ((bytes[2] as u32) << 16) | ((bytes[3] as u32) << 24);
     u32::from_be(val)
@@ -27,6 +26,14 @@ impl Checksum {
     #[inline]
     pub fn none() -> Checksum {
         Checksum::new(ChecksumType::None)
+    }
+
+    #[inline]
+    pub fn is_none(&self) -> bool {
+        match self.checksum_type {
+            ChecksumType::None => true,
+            _ => false,
+        }
     }
 
     #[inline]
@@ -80,7 +87,7 @@ mod test {
 
     #[test]
     fn adler32() {
-        let bytes = vec![0x00, 0x00, 0x01, 0x0b];
-        assert_eq!(adler32_from_bytes(&bytes[..]), 267);
+        let bytes = [0x00, 0x00, 0x01, 0x0b];
+        assert_eq!(adler32_from_bytes(&bytes), 267);
     }
 }

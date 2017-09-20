@@ -70,4 +70,17 @@ mod test {
                        76, 82, 4, 0, 0, 0, 0, 0];
         inflate_bytes_zlib(&encoded).unwrap_err();
     }
+
+    #[test]
+    fn inflate_bytes_with_zlib_trailing() {
+        use super::inflate_bytes_zlib;
+        use std::str::from_utf8;
+
+        // The additional 4 bytes should be ignored.
+        let encoded = [120, 156, 243, 72, 205, 201, 201, 215, 81, 168, 202, 201,
+                       76, 82, 4, 0, 27, 101, 4, 19, 0, 0, 0, 0];
+        let decoded = inflate_bytes_zlib(&encoded).unwrap();
+        assert!(from_utf8(&decoded).unwrap() == "Hello, zlib!");
+    }
+
 }
