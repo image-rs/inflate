@@ -43,5 +43,19 @@ fn no_checksum() {
     let data = b"\x13\xff\xed\xff\xff\x12\xbfM\x00\x00\x00\x00\xd1";
     let mut stream = inflate::InflateStream::new();
     let res = stream.update(data);
-    assert!(res.is_err());
+    // This is not an error, because the checksum may be included in the next
+    // call to `stream.update`. See issue #27.
+    assert!(res.is_ok());
+}
+
+#[test]
+/// The first byte of the CRC is already read into the BitStream buffer.
+fn issue_26() {
+    let data = &[120, 156, 189, 138, 65, 13, 0, 32, 16, 195, 64, 2, 22, 176, 128, 5, 44, 96, 1, 11,
+        216, 103, 19, 176, 123, 118, 73, 155, 61, 218, 155, 54, 10, 136, 192, 170, 32, 130, 41,
+        249, 36, 136, 96, 73, 62, 9, 34, 216, 146, 79, 130, 8, 142, 228, 147, 32, 130, 43, 249, 36,
+        136, 224, 73, 62, 9, 32, 248, 250, 192, 22, 113, 123];
+    let mut stream = inflate::InflateStream::from_zlib();
+    let res = stream.update(data);
+    assert!(res.is_ok());
 }

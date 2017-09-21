@@ -259,6 +259,26 @@ impl<'a> BitStream<'a> {
         while self.state.n + 8 <= 32 && self.use_byte() {}
         self.state
     }
+
+    fn align_byte(&mut self) {
+        if self.state.n > 0 {
+            let n = self.state.n % 8;
+            self.take(n);
+        }
+    }
+
+    fn trailing_bytes(&mut self) -> (u8, [u8; 4]) {
+        let mut len = 0;
+        let mut bytes = [0; 4];
+        self.align_byte();
+        while self.state.n >= 8 {
+            bytes[len as usize] = self.state.v as u8;
+            len += 1;
+            self.state.n -= 8;
+            self.state.v >>= 8;
+        }
+        (len, bytes)
+    }
 }
 
 /// Generate huffman codes from the given set of lengths and run `$cb` on them except the first
@@ -528,7 +548,8 @@ enum State {
     Bits(BitsNext, BitState),
     LenDist((BitsNext, BitState), /* len */ u16, /* dist */ u16),
     Uncompressed(/* len */ u16),
-    CheckCRC
+    CheckCRC(/* len */ u8, /* bytes */ [u8; 4]),
+    Finished
 }
 
 use self::State::*;
@@ -776,7 +797,8 @@ impl InflateStream {
                 match next {
                     BlockHeader => {
                         if self.final_block {
-                            return ok_state!(CheckCRC);
+                            let (len, bytes) = stream.trailing_bytes();
+                            return ok_state!(CheckCRC(len, bytes));
                         }
                         let h = take!(3);
                         let (final_, block_type) = ((h & 1) != 0, (h >> 1) & 0b11);
@@ -786,10 +808,7 @@ impl InflateStream {
                         match block_type {
                             0 => {
                                 // Skip to the next byte for an uncompressed block.
-                                let nbits = stream.state.n;
-                                if nbits > 0 {
-                                    let _ = take!(nbits % 8);
-                                }
+                                stream.align_byte();
                                 ok!(BlockUncompressed)
                             }
                             1 => {
@@ -888,7 +907,8 @@ impl InflateStream {
                                 match code {
                                     0 => {
                                         return if self.final_block {
-                                            ok_state!(CheckCRC)
+                                            let (len, bytes) = stream.trailing_bytes();
+                                            ok_state!(CheckCRC(len, bytes))
                                         } else {
                                             ok!(BlockHeader)
                                         }
@@ -1001,7 +1021,8 @@ impl InflateStream {
                                 match code {
                                     0 => {
                                         return if self.final_block {
-                                            ok_state!(CheckCRC)
+                                            let (len, bytes) = stream.trailing_bytes();
+                                            ok_state!(CheckCRC(len, bytes))
                                         } else {
                                             ok!(BlockHeader)
                                         }
@@ -1060,15 +1081,29 @@ impl InflateStream {
                 }
                 ok_bytes!(data.len(), Uncompressed(len))
             }
-            CheckCRC => {
-                if data.len() < 4 {
-                    return Err("data stream ends without a checksum".into());
+            CheckCRC(mut len, mut bytes) => {
+                if self.checksum.is_none() {
+                    // TODO: inform caller of unused bytes
+                    return ok_bytes!(0, Finished);
                 }
-                // Get the checksum value from the end of the stream.
-                self.read_checksum = Some(adler32_from_bytes(data));
 
-                // The checksum is a 32-bit value, aka 4 bytes long.
-                ok_bytes!(4, CheckCRC)
+                // Get the checksum value from the end of the stream.
+                let mut used = 0;
+                while len < 4 && used < data.len() {
+                    bytes[len as usize] = data[used];
+                    len += 1;
+                    used += 1;
+                }
+                if len < 4 {
+                    return ok_bytes!(used, CheckCRC(len, bytes));
+                }
+
+                self.read_checksum = Some(adler32_from_bytes(&bytes));
+                ok_bytes!(used, Finished)
+            }
+            Finished => {
+                // TODO: inform caller of unused bytes
+                Ok(data.len())
             }
         }
     }
