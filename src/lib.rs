@@ -635,6 +635,9 @@ impl InflateStream {
             } else {
                 (dist, pos_end - dist)
             };
+            if dist > buffer_size {
+                return Err("run length distance is bigger than the window size".to_owned());
+            }
             let forward = buffer_size - dist;
             // assert for unsafe code:
             if pos_end + forward > self.buffer.len() as u16 {
