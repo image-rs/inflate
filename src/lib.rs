@@ -557,7 +557,6 @@ use self::State::*;
 enum BitsNext {
     BlockHeader,
     BlockUncompressed,
-    BlockFixed,
     BlockDynHlit,
     BlockDynHdist(/* hlit */ u8),
     BlockDynHclen(/* hlit */ u8, /* hdist */ u8),
@@ -769,7 +768,6 @@ impl InflateStream {
                 let mut stream = BitStream::new(data, state);
                 macro_rules! ok_state (($state:expr) => ({self.state = Some($state); Ok(stream.used)}));
                 macro_rules! ok (($next:expr) => (ok_state!(Bits($next, stream.fill()))));
-                macro_rules! need (($n:expr) => (if !stream.need($n) { return ok!(next); }));
                 macro_rules! take (
                     ($n:expr => $next:expr) => (match stream.take($n) {
                         Some(v) => v,
@@ -815,36 +813,35 @@ impl InflateStream {
                                 ok!(BlockUncompressed)
                             }
                             1 => {
-                                // let lit = DynHuffman16::new(&[
-                                // 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 0-15
-                                // 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 16-31
-                                // 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 32-47
-                                // 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 48-63
-                                // 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 64-79
-                                // 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 80-95
-                                // 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 96-101
-                                // 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 112-127
-                                // 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 128-143
-                                // 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 144-159
-                                // 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 160-175
-                                // 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 176-191
-                                // 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 192-207
-                                // 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 208-223
-                                // 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 224-239
-                                // 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 240-255
-                                // 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, // 256-271
-                                // 7, 7, 7, 7, 7, 7, 7, 7, // 272-279
-                                // 8, 8, 8, 8, 8, 8, 8, 8, // 280-287
-                                // ]);
-                                // let dist = DynHuffman16::new(&[
-                                // 5, 5, 5, 5, 5, 5, 5, 5,
-                                // 5, 5, 5, 5, 5, 5, 5, 5,
-                                // 5, 5, 5, 5, 5, 5, 5, 5,
-                                // 5, 5, 5, 5, 5, 5, 5, 5
-                                // ]);
-                                // ok!(BlockDyn(lit, dist, 0))
-                                //
-                                ok!(BlockFixed)
+                                // Unwrap is safe because the data is valid.
+                                let lit = DynHuffman16::new(&[
+                                    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 0-15
+                                    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 16-31
+                                    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 32-47
+                                    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 48-63
+                                    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 64-79
+                                    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 80-95
+                                    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 96-101
+                                    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 112-127
+                                    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, // 128-143
+                                    9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 144-159
+                                    9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 160-175
+                                    9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 176-191
+                                    9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 192-207
+                                    9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 208-223
+                                    9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 224-239
+                                    9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 240-255
+                                    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, // 256-271
+                                    7, 7, 7, 7, 7, 7, 7, 7, // 272-279
+                                    8, 8, 8, 8, 8, 8, 8, 8, // 280-287
+                                ]).unwrap();
+                                let dist = DynHuffman16::new(&[
+                                    5, 5, 5, 5, 5, 5, 5, 5,
+                                    5, 5, 5, 5, 5, 5, 5, 5,
+                                    5, 5, 5, 5, 5, 5, 5, 5,
+                                    5, 5, 5, 5, 5, 5, 5, 5
+                                ]).unwrap();
+                                ok!(BlockDyn(lit, dist, 0))
                             }
                             2 => ok!(BlockDynHlit),
                             _ => {
@@ -861,104 +858,6 @@ impl InflateStream {
                             return Err(format!("invalid uncompressed block len: LEN: {:04x} NLEN: {:04x}", len, nlen));
                         }
                         ok_state!(Uncompressed(len))
-                    }
-                    BlockFixed => {
-                        let mut save;
-                        macro_rules! len_dist2 (($len:expr, $code_const:expr, $code_rev:expr, $bits:expr) => ({
-                            len_dist!($len, $code_const + ($code_rev >> 4), $bits => {stream = save; next}, next);
-                        }));
-                        macro_rules! len (($code:expr, $bits:expr) => ({
-                            let len = 3 + if $bits == 0 { 0 } else { // new_base
-                                4 << $bits
-                            } + ((if $code == 29 {
-                                256
-                            } else {
-                                $code as u16
-                            } - if $bits == 0 { 0 } else { // old_base
-                                $bits * 4 + 4
-                            } - 1) << $bits) + take!($bits => {stream = save; next}) as u16;
-                            let code = take!(5 => {stream = save; next});
-                            debug!("  {:05b}", BIT_REV_U8[(code << 3) as usize]);
-                            match code {
-                                0b00000 | 0b10000 => len_dist2!(len, 0, code, 0),
-                                0b01000 | 0b11000 => len_dist2!(len, 2, code, 0),
-                                0b00100 | 0b10100 => len_dist2!(len, 4, code, 1),
-                                0b01100 | 0b11100 => len_dist2!(len, 6, code, 2),
-                                0b00010 | 0b10010 => len_dist2!(len, 8, code, 3),
-                                0b01010 | 0b11010 => len_dist2!(len, 10, code, 4),
-                                0b00110 | 0b10110 => len_dist2!(len, 12, code, 5),
-                                0b01110 | 0b11110 => len_dist2!(len, 14, code, 6),
-                                0b00001 | 0b10001 => len_dist2!(len, 16, code, 7),
-                                0b01001 | 0b11001 => len_dist2!(len, 18, code, 8),
-                                0b00101 | 0b10101 => len_dist2!(len, 20, code, 9),
-                                0b01101 | 0b11101 => len_dist2!(len, 22, code, 10),
-                                0b00011 | 0b10011 => len_dist2!(len, 24, code, 11),
-                                0b01011 | 0b11011 => len_dist2!(len, 26, code, 12),
-                                0b00111 | 0b10111 => len_dist2!(len, 28, code, 13),
-                                _ => return Err(format!("bad DEFLATE dist code {}", code))
-                            }
-                        }));
-                        loop {
-                            need!(7);
-                            // 0000000 through 0010111
-                            if (stream.state.v & 0b11) == 0b00 &&
-                               (stream.state.v & 0b1100) != 0b1100 {
-                                save = stream.clone();
-                                // FIXME(eddyb) use a 7-bit rev LUT or match the huffman code directly.
-                                let code = BIT_REV_U8[(stream.take(7).unwrap() << 1) as usize];
-                                debug!("{:09b}", code as u16 + 256);
-                                match code {
-                                    0 => {
-                                        return if self.final_block {
-                                            let (len, bytes) = stream.trailing_bytes();
-                                            ok_state!(CheckCRC(len, bytes))
-                                        } else {
-                                            ok!(BlockHeader)
-                                        }
-                                    }
-                                    1...8 => len!(code, 0),
-                                    9...12 => len!(code, 1),
-                                    13...16 => len!(code, 2),
-                                    17...20 => len!(code, 3),
-                                    21...23 => len!(code, 4),
-                                    _ => return Err(format!("bad DEFLATE len code {}", code as u16 + 256)),
-                                };
-                                continue;
-                            }
-
-                            need!(8);
-                            // 00110000 through 10111111
-                            if (stream.state.v & 0b11) != 0b11 {
-                                save = stream.clone();
-                                // FIXME(eddyb) use a specialized rev LUT with addend.
-                                let code = BIT_REV_U8[(stream.take(8).unwrap()) as usize] - 0b0011_0000;
-                                debug!("{:09b}", code);
-                                push_or!(code, ok!({stream = save; next}));
-                                continue;
-                            }
-                            // 11000000 through 11000111
-                            if (stream.state.v & 0b11100) == 0b00000 {
-                                save = stream.clone();
-                                // FIXME(eddyb) use a 3-bit rev LUT or match the huffman code directly.
-                                let code = 24 + (BIT_REV_U8[stream.take(8).unwrap() as usize] - 0b11000000);
-                                debug!("{:09b}", code as u16 + 256);
-                                match code {
-                                    24 => len!(24, 4),
-                                    25...28 => len!(code, 5),
-                                    29 => len!(29, 0),
-                                    _ => return Err(format!("bad DEFLATE len code {}", code as u16 + 256)),
-                                };
-                                continue;
-                            }
-
-                            need!(9);
-                            // 110010000 through 111111111
-                            save = stream.clone();
-                            // FIXME(eddyb) use a specialized rev LUT with addend.
-                            let code = BIT_REV_U8[(stream.take16(9).unwrap() >> 1) as usize];
-                            debug!("{:09b}", code);
-                            push_or!(code, ok!({stream = save; next}));
-                        }
                     }
                     BlockDynHlit => ok!(BlockDynHdist(take!(5) + 1)),
                     BlockDynHdist(hlit) => ok!(BlockDynHclen(hlit, take!(5) + 1)),
