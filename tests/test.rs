@@ -90,3 +90,43 @@ fn issue_26() {
     let res = stream.update(data);
     assert!(res.is_ok());
 }
+
+#[test]
+/// InflateStream::update() should try to process bytes in the Bits state.
+fn issue_38_update_bits() {
+    // compressed final block 011, literal 111111111=255, end 0000000
+    let data = &[0b1111_1011, 0b0000_1111, 0b0000_0000];
+    let bytes = inflate::inflate_bytes(data).unwrap();
+    assert_eq!(bytes.len(), 1);
+}
+
+#[test]
+/// InflateStream::update() should try to process bytes in the LenDist state.
+fn issue_38_update_lendist() {
+    // compressed final block 011, literal 00110000=0 x 32766, len 0000001=3, dist 00000=1, end 0000000
+    let mut data = vec![0b0110_0011];
+    data.extend(std::iter::repeat(0b0110_0000).take(32765));
+    data.extend(vec![0b0000_0000, 0b0000_0010, 0b0000_00000]);
+    let bytes = inflate::inflate_bytes(&data).unwrap();
+    assert_eq!(bytes.len(), 32769);
+}
+
+#[test]
+/// InflateStream::update() should return if it can't make progress
+fn issue_38_update_no_progress() {
+    // compressed final block 011, 110010000 x 5, 110010000 truncated to 8 bits
+    let data = &[0b1001_1011, 0b0011_0000, 0b0110_0001, 0b1100_0010, 0b10000100, 0b0000_1001, 0b00010011];
+    let bytes = inflate::inflate_bytes(data).unwrap();
+    assert_eq!(bytes.len(), 5);
+}
+
+#[test]
+/// inflate() should loop until no data is produced.
+fn issue_38_inflate() {
+    // compressed final block 011, literal 00110000=0 x 32769, end 0000000
+    let mut data = vec![0b0110_0011];
+    data.extend(std::iter::repeat(0b0110_0000).take(32768));
+    data.extend(vec![0b0000_0000, 0b0000_0000]);
+    let bytes = inflate::inflate_bytes(&data).unwrap();
+    assert_eq!(bytes.len(), 32769);
+}

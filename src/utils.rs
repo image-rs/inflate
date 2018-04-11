@@ -16,8 +16,11 @@ fn inflate(inflater: &mut InflateStream, data: &[u8]) -> Result<Vec<u8>, String>
     let mut decoded = Vec::<u8>::new();
 
     let mut n = 0;
-    while n < data.len() {
+    loop {
         let (num_bytes_read, bytes) = try!(inflater.update(&data[n..]));
+        if bytes.len() == 0 {
+            break;
+        }
         n += num_bytes_read;
         decoded.extend(bytes.iter().map(|v| *v));
     }
