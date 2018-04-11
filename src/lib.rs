@@ -490,7 +490,7 @@ impl DynHuffman16 {
         });
         debug!("=== DYN HUFFMAN ===");
         for _i in 0..256 {
-            debug!("{:08b} {:04x}", i, patterns[BIT_REV_U8[_i] as usize]);
+            debug!("{:08b} {:04x}", _i, patterns[BIT_REV_U8[_i] as usize]);
         }
         debug!("===================");
         Ok(DynHuffman16 {
@@ -1005,7 +1005,7 @@ impl InflateStream {
             }
             Finished => {
                 // TODO: inform caller of unused bytes
-                Ok(data.len())
+                ok_bytes!(data.len(), Finished)
             }
         }
     }
@@ -1025,8 +1025,11 @@ impl InflateStream {
     pub fn update<'a>(&'a mut self, mut data: &[u8]) -> Result<(usize, &'a [u8]), String> {
         let original_size = data.len();
         let original_pos = self.pos as usize;
-        while data.len() > 0 &&
+        let mut empty = false;
+        while !empty &&
               ((self.pos as usize) < self.buffer.capacity() || self.buffer.capacity() == 0) {
+            // next_state must be called at least once after the data is empty.
+            empty = data.is_empty();
             match self.next_state(data) {
                 Ok(n) => {
                     data = &data[n..];
