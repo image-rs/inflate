@@ -750,6 +750,10 @@ impl InflateStream {
                 ok_bytes!(1, ZlibFlags(b))
             }
             ZlibFlags(cmf) => {
+                if data.len() == 0 {
+                    self.state = Some(ZlibFlags(cmf));
+                    return Ok(0);
+                };
                 let b = data[0];
                 let (_check, dict, _level) = (b & 0x1F, (b & 0x20) != 0, b >> 6);
                 debug!("ZLIB FCHECK=0x{:x} FDICT={} FLEVEL=0x{:x}", _check, dict, _level);
