@@ -731,7 +731,13 @@ impl InflateStream {
         }));
         match self.state.take().unwrap() {
             ZlibMethodAndFlags => {
-                let b = data[0];
+                let b = match data.get(0) {
+                    Some(&x) => x,
+                    None => {
+                        self.state = Some(ZlibMethodAndFlags);
+                        return Ok(0);
+                    }
+                };
                 let (method, info) = (b & 0xF, b >> 4);
                 debug!("ZLIB CM=0x{:x} CINFO=0x{:x}", method, info);
 
@@ -750,11 +756,13 @@ impl InflateStream {
                 ok_bytes!(1, ZlibFlags(b))
             }
             ZlibFlags(cmf) => {
-                if data.len() == 0 {
-                    self.state = Some(ZlibFlags(cmf));
-                    return Ok(0);
+                let b = match data.get(0) {
+                    Some(&x) => x,
+                    None => {
+                        self.state = Some(ZlibFlags(cmf));
+                        return Ok(0);
+                    }
                 };
-                let b = data[0];
                 let (_check, dict, _level) = (b & 0x1F, (b & 0x20) != 0, b >> 6);
                 debug!("ZLIB FCHECK=0x{:x} FDICT={} FLEVEL=0x{:x}", _check, dict, _level);
 
