@@ -638,26 +638,13 @@ impl InflateStream {
                 return Err("run length distance is bigger than the window size".to_owned());
             }
             let forward = buffer_size - dist;
-            // assert for unsafe code:
             if pos_end + forward > self.buffer.len() as u16 {
                 return Err("invalid run length in stream".to_owned());
             }
-            unsafe {
-                // HACK(eddyb) avoid bound checks, LLVM can't optimize these.
-                let buffer = self.buffer.as_mut_ptr();
-                let dst_end = buffer.offset(pos_end as isize);
-                let mut dst = buffer.offset(self.pos as isize);
-                let mut src = dst.offset(forward as isize);
-                while dst < dst_end {
-                    *dst = *src;
-                    dst = dst.offset(1);
-                    src = src.offset(1);
-                }
+
+            for i in self.pos as usize..pos_end as usize {
+            self.buffer[i] = self.buffer[i + forward as usize]
             }
-            // for i in self.pos as usize..pos_end as usize {
-            // self.buffer[i] = self.buffer[i + forward as usize]
-            // }
-            //
             self.pos = pos_end;
             left
         } else {
@@ -677,26 +664,13 @@ impl InflateStream {
             }
         }
 
-        // assert for unsafe code:
         if self.pos < dist && pos_end > self.pos {
             return Err("invalid run length in stream".to_owned());
         }
-        unsafe {
-            // HACK(eddyb) avoid bound checks, LLVM can't optimize these.
-            let buffer = self.buffer.as_mut_ptr();
-            let dst_end = buffer.offset(pos_end as isize);
-            let mut dst = buffer.offset(self.pos as isize);
-            let mut src = dst.offset(-(dist as isize));
-            while dst < dst_end {
-                *dst = *src;
-                dst = dst.offset(1);
-                src = src.offset(1);
-            }
+
+        for i in self.pos as usize..pos_end as usize {
+        self.buffer[i] = self.buffer[i - dist as usize]
         }
-        // for i in self.pos as usize..pos_end as usize {
-        // self.buffer[i] = self.buffer[i - dist as usize]
-        // }
-        //
         self.pos = pos_end;
         Ok(left)
     }
