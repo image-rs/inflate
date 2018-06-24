@@ -658,16 +658,15 @@ impl InflateStream {
             (buffer_size, Some(pos_end - buffer_size))
         };
 
+        if self.pos < dist && pos_end > self.pos {
+            return Err("invalid run length in stream".to_owned());
+        }
+
         if self.buffer.len() < pos_end as usize {
             unsafe {
                 self.buffer.set_len(pos_end as usize);
             }
         }
-
-        if self.pos < dist && pos_end > self.pos {
-            return Err("invalid run length in stream".to_owned());
-        }
-
         for i in self.pos as usize..pos_end as usize {
         self.buffer[i] = self.buffer[i - dist as usize]
         }
