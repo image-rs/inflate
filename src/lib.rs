@@ -643,7 +643,7 @@ impl InflateStream {
             }
 
             for i in self.pos as usize..pos_end as usize {
-            self.buffer[i] = self.buffer[i + forward as usize]
+                self.buffer[i] = self.buffer[i + forward as usize]
             }
             self.pos = pos_end;
             left
