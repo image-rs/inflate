@@ -386,7 +386,7 @@ impl CodeLengthReader {
                         self.result.push(0);
                     }
                 }
-                _ => panic!(),
+                _ => unreachable!(),
             }
         }
         Ok(true)
