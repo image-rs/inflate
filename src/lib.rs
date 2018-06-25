@@ -65,7 +65,7 @@
 //! }
 //! ```
 
-#![cfg_attr(feature = "unstable", feature(core))]
+#![cfg_attr(feature = "unstable", feature(core_intrinsics))]
 
 extern crate adler32;
 
