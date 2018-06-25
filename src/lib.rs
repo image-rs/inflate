@@ -65,8 +65,6 @@
 //! }
 //! ```
 
-#![cfg_attr(feature = "unstable", feature(core_intrinsics))]
-
 extern crate adler32;
 
 use std::cmp;
@@ -182,16 +180,6 @@ struct BitStream<'a> {
     state: BitState,
 }
 
-// Use this instead of triggering a panic (that will unwind).
-#[cfg(feature = "unstable")]
-fn abort() -> ! {
-    unsafe { ::std::intrinsics::abort() }
-}
-#[cfg(not(feature = "unstable"))]
-fn abort() -> ! {
-    panic!()
-}
-
 #[cfg(debug)]
 macro_rules! debug { ($($x:tt)*) => (println!($($x)*)) }
 #[cfg(not(debug))]
@@ -224,10 +212,7 @@ impl<'a> BitStream<'a> {
                 return false;
             }
             if n > 8 && self.state.n < n {
-                if n > 16 {
-                    // HACK(eddyb) in place of a static assert.
-                    abort();
-                }
+                assert!(n <= 16);
                 if !self.use_byte() {
                     return false;
                 }
@@ -248,10 +233,7 @@ impl<'a> BitStream<'a> {
     }
 
     fn take(&mut self, n: u8) -> Option<u8> {
-        if n > 8 {
-            // HACK(eddyb) in place of a static assert.
-            abort();
-        }
+        assert!(n <= 8);
         self.take16(n).map(|v: u16| v as u8)
     }
 
@@ -404,7 +386,7 @@ impl CodeLengthReader {
                         self.result.push(0);
                     }
                 }
-                _ => abort(),
+                _ => panic!(),
             }
         }
         Ok(true)
@@ -689,9 +671,7 @@ impl InflateStream {
             if (self.pos as usize) < self.buffer.len() {
                 self.buffer[self.pos as usize] = b;
             } else {
-                if (self.pos as usize) != self.buffer.len() {
-                    abort();
-                }
+                assert_eq!(self.pos as usize, self.buffer.len());
                 self.buffer.push(b);
             }
             self.pos += 1;
