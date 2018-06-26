@@ -658,6 +658,7 @@ impl InflateStream {
                 self.buffer.set_len(pos_end as usize);
             }
         }
+        assert!(dist > 0);
         for i in self.pos as usize..pos_end as usize {
             self.buffer[i] = self.buffer[i - dist as usize];
         }
