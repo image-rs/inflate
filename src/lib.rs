@@ -65,8 +65,6 @@
 //! }
 //! ```
 
-#![cfg_attr(feature = "unstable", feature(core))]
-
 extern crate adler32;
 
 use std::cmp;
@@ -182,16 +180,6 @@ struct BitStream<'a> {
     state: BitState,
 }
 
-// Use this instead of triggering a panic (that will unwind).
-#[cfg(feature = "unstable")]
-fn abort() -> ! {
-    unsafe { ::std::intrinsics::abort() }
-}
-#[cfg(not(feature = "unstable"))]
-fn abort() -> ! {
-    panic!()
-}
-
 #[cfg(debug)]
 macro_rules! debug { ($($x:tt)*) => (println!($($x)*)) }
 #[cfg(not(debug))]
@@ -224,10 +212,7 @@ impl<'a> BitStream<'a> {
                 return false;
             }
             if n > 8 && self.state.n < n {
-                if n > 16 {
-                    // HACK(eddyb) in place of a static assert.
-                    abort();
-                }
+                assert!(n <= 16);
                 if !self.use_byte() {
                     return false;
                 }
@@ -248,10 +233,7 @@ impl<'a> BitStream<'a> {
     }
 
     fn take(&mut self, n: u8) -> Option<u8> {
-        if n > 8 {
-            // HACK(eddyb) in place of a static assert.
-            abort();
-        }
+        assert!(n <= 8);
         self.take16(n).map(|v: u16| v as u8)
     }
 
@@ -404,7 +386,7 @@ impl CodeLengthReader {
                         self.result.push(0);
                     }
                 }
-                _ => abort(),
+                _ => unreachable!(),
             }
         }
         Ok(true)
@@ -625,6 +607,10 @@ impl InflateStream {
     fn run_len_dist(&mut self, len: u16, dist: u16) -> Result<Option<u16>, String> {
         debug!("RLE -{}; {} (cap={} len={})", dist, len,
                self.buffer.capacity(), self.buffer.len());
+        if dist < 1 {
+            return Err("invalid run length in stream".to_owned());
+        }
+        // `buffer_size` is used for validating `unsafe` below, handle with care
         let buffer_size = self.buffer.capacity() as u16;
         let len = if self.pos < dist {
             // Handle copying from ahead, until we hit the end reading.
@@ -638,26 +624,13 @@ impl InflateStream {
                 return Err("run length distance is bigger than the window size".to_owned());
             }
             let forward = buffer_size - dist;
-            // assert for unsafe code:
             if pos_end + forward > self.buffer.len() as u16 {
                 return Err("invalid run length in stream".to_owned());
             }
-            unsafe {
-                // HACK(eddyb) avoid bound checks, LLVM can't optimize these.
-                let buffer = self.buffer.as_mut_ptr();
-                let dst_end = buffer.offset(pos_end as isize);
-                let mut dst = buffer.offset(self.pos as isize);
-                let mut src = dst.offset(forward as isize);
-                while dst < dst_end {
-                    *dst = *src;
-                    dst = dst.offset(1);
-                    src = src.offset(1);
-                }
+
+            for i in self.pos as usize..pos_end as usize {
+                self.buffer[i] = self.buffer[i + forward as usize];
             }
-            // for i in self.pos as usize..pos_end as usize {
-            // self.buffer[i] = self.buffer[i + forward as usize]
-            // }
-            //
             self.pos = pos_end;
             left
         } else {
@@ -671,32 +644,23 @@ impl InflateStream {
             (buffer_size, Some(pos_end - buffer_size))
         };
 
+        if self.pos < dist && pos_end > self.pos {
+            return Err("invalid run length in stream".to_owned());
+        }
+
         if self.buffer.len() < pos_end as usize {
+            // ensure the buffer length will not exceed the amount of allocated memory
+            assert!(pos_end <= buffer_size);
+            // ensure that the uninitialized chunk of memory will be fully overwritten
+            assert!(self.pos as usize <= self.buffer.len());
             unsafe {
                 self.buffer.set_len(pos_end as usize);
             }
         }
-
-        // assert for unsafe code:
-        if self.pos < dist && pos_end > self.pos {
-            return Err("invalid run length in stream".to_owned());
+        assert!(dist > 0); // validation against reading uninitialized memory
+        for i in self.pos as usize..pos_end as usize {
+            self.buffer[i] = self.buffer[i - dist as usize];
         }
-        unsafe {
-            // HACK(eddyb) avoid bound checks, LLVM can't optimize these.
-            let buffer = self.buffer.as_mut_ptr();
-            let dst_end = buffer.offset(pos_end as isize);
-            let mut dst = buffer.offset(self.pos as isize);
-            let mut src = dst.offset(-(dist as isize));
-            while dst < dst_end {
-                *dst = *src;
-                dst = dst.offset(1);
-                src = src.offset(1);
-            }
-        }
-        // for i in self.pos as usize..pos_end as usize {
-        // self.buffer[i] = self.buffer[i - dist as usize]
-        // }
-        //
         self.pos = pos_end;
         Ok(left)
     }
@@ -713,9 +677,7 @@ impl InflateStream {
             if (self.pos as usize) < self.buffer.len() {
                 self.buffer[self.pos as usize] = b;
             } else {
-                if (self.pos as usize) != self.buffer.len() {
-                    abort();
-                }
+                assert_eq!(self.pos as usize, self.buffer.len());
                 self.buffer.push(b);
             }
             self.pos += 1;
