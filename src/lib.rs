@@ -614,6 +614,7 @@ impl InflateStream {
         if dist < 1 {
             return Err("invalid run length in stream".to_owned());
         }
+        // `buffer_size` is used for validating `unsafe` below, handle with care
         let buffer_size = self.buffer.capacity() as u16;
         let len = if self.pos < dist {
             // Handle copying from ahead, until we hit the end reading.
@@ -658,7 +659,7 @@ impl InflateStream {
                 self.buffer.set_len(pos_end as usize);
             }
         }
-        assert!(dist > 0);
+        assert!(dist > 0); // validation against reading uninitialized memory
         for i in self.pos as usize..pos_end as usize {
             self.buffer[i] = self.buffer[i - dist as usize];
         }
