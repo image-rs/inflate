@@ -607,6 +607,10 @@ impl InflateStream {
     fn run_len_dist(&mut self, len: u16, dist: u16) -> Result<Option<u16>, String> {
         debug!("RLE -{}; {} (cap={} len={})", dist, len,
                self.buffer.capacity(), self.buffer.len());
+        // `dist > 0` validation is cruicual for unsafe block below.
+        // Not validating it would let an attacker obtain contents of uninitialized memory,
+        // which is a serious security vulnerability for e.g. PNG decoders using this crate.
+        // See http://seclists.org/fulldisclosure/2013/Nov/83 for such vulns in C libs.
         if dist < 1 {
             return Err("invalid run length in stream".to_owned());
         }
