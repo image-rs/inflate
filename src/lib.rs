@@ -649,6 +649,7 @@ impl InflateStream {
 
         if self.buffer.len() < pos_end as usize {
             assert!(pos_end <= buffer_size);
+            assert!(self.pos as usize <= self.buffer.len());
             unsafe {
                 self.buffer.set_len(pos_end as usize);
             }
