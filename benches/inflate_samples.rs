@@ -36,7 +36,7 @@ fn knock_ogg(c: &mut Criterion) {
 
 criterion_group!{
     name = benches;
-    config = Criterion::default().sample_size(1000);
+    config = Criterion::default().sample_size(200);
     targets = abc_txt, heavily_compressed_text, lightly_compressed_text, knock_ogg
 }
 
