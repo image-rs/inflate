@@ -1,6 +1,6 @@
 [package]
 name = "inflate"
-version = "0.4.3"
+version = "0.5.0"
 license = "MIT"
 description = "DEFLATE decoding"
 authors = ["nwin <nwin@users.noreply.github.com>"]
