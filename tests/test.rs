@@ -130,3 +130,27 @@ fn issue_38_inflate() {
     let bytes = inflate::inflate_bytes(&data).unwrap();
     assert_eq!(bytes.len(), 32769);
 }
+
+#[test]
+/// InflateStream::update() should handle end of input between uncompressed len and nlen.
+fn issue_47_uncompressed() {
+    let len = 50;
+    let hilen = (len >> 8) as u8;
+    let lolen = (len & 0xff) as u8;
+    // uncompressed block 001
+    let mut data = vec![0b001, lolen, hilen, !lolen, !hilen];
+    data.extend(std::iter::repeat(0).take(len + 1));
+    let mut stream = inflate::InflateStream::new();
+    {
+        // Update with input to the end of len.
+        let (update_len, bytes) = stream.update(&data[..3]).unwrap();
+        assert_eq!(update_len, 3);
+        assert_eq!(bytes, &[]);
+    }
+    {
+        // Update with remainder of input.
+        let (update_len, bytes) = stream.update(&data[3..]).unwrap();
+        assert_eq!(update_len, data.len() - 3);
+        assert_eq!(bytes.len(), len);
+    }
+}

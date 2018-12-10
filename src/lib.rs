@@ -538,7 +538,8 @@ use self::State::*;
 
 enum BitsNext {
     BlockHeader,
-    BlockUncompressed,
+    BlockUncompressedLen,
+    BlockUncompressedNlen(/* len */ u16),
     BlockDynHlit,
     BlockDynHdist(/* hlit */ u8),
     BlockDynHclen(/* hlit */ u8, /* hdist */ u8),
@@ -784,7 +785,7 @@ impl InflateStream {
                             0 => {
                                 // Skip to the next byte for an uncompressed block.
                                 stream.align_byte();
-                                ok!(BlockUncompressed)
+                                ok!(BlockUncompressedLen)
                             }
                             1 => {
                                 // Unwrap is safe because the data is valid.
@@ -824,8 +825,11 @@ impl InflateStream {
                             }
                         }
                     }
-                    BlockUncompressed => {
+                    BlockUncompressedLen => {
                         let len = take16!(16);
+                        ok_state!(Bits(BlockUncompressedNlen(len), stream.state))
+                    }
+                    BlockUncompressedNlen(len) => {
                         let nlen = take16!(16);
                         assert_eq!(stream.state.n, 0);
                         if !len != nlen {
