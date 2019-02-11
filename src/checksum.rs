@@ -1,9 +1,8 @@
 use adler32::RollingAdler32;
 
 pub fn adler32_from_bytes(bytes: &[u8; 4]) -> u32 {
-    let val: u32 = (bytes[0] as u32) | ((bytes[1] as u32) << 8) |
-       ((bytes[2] as u32) << 16) | ((bytes[3] as u32) << 24);
-    u32::from_be(val)
+    (bytes[3] as u32) | ((bytes[2] as u32) << 8) |
+       ((bytes[1] as u32) << 16) | ((bytes[0] as u32) << 24)
 }
 
 /// Whether we should validate the checksum, and what type of checksum it is.
