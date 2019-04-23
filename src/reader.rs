@@ -177,7 +177,7 @@ impl<R: BufRead> Read for DeflateDecoderBuf<R> {
         // There is space in `buf` for more data, so try to read more.
         let (input_bytes_read, remaining_bytes) = {
             self.pending_output_bytes = 0;
-            let input = try!(self.reader.fill_buf());
+            let input = self.reader.fill_buf()?;
             if input.len() == 0 {
                 self.total_out += bytes_out as u64;
                 //If there is nothing more to read, return.

@@ -286,10 +286,9 @@ macro_rules! with_codes (($clens:expr, $max_bits:expr => $code_ty:ty, $cb:expr) 
     // TODO use range_inclusive as soon as it is stable
     //for bits in range_inclusive(1, $max_bits) {
     for bits in 1..$max_bits + 1 {
-        code = try!(
+        code =
             code.checked_add(bl_count[bits as usize - 1])
-                .ok_or_else(|| "Error generating huffman codes: Invalid set of code lengths")
-        ) << 1;
+                .ok_or_else(|| "Error generating huffman codes: Invalid set of code lengths")? << 1;
         next_code[bits as usize] = code;
     }
 
@@ -299,10 +298,9 @@ macro_rules! with_codes (($clens:expr, $max_bits:expr => $code_ty:ty, $cb:expr) 
             let code = next_code[bits as usize];
             // If there is an overflow here, the given set of code lengths won't allow enough
             // unique codes to be generated.
-            let new_code = try!(
+            let new_code =
                 code.checked_add(1)
-                    .ok_or_else(|| "Error generating huffman codes: Invalid set of code lengths!")
-            );
+                    .ok_or_else(|| "Error generating huffman codes: Invalid set of code lengths!")?;
             next_code[bits as usize] = new_code;
             match $cb(i as $code_ty, code, bits) {
                 Ok(()) => (),
@@ -394,8 +392,8 @@ impl CodeLengthReader {
 
     fn to_lit_and_dist(&self) -> Result<(DynHuffman16, DynHuffman16), String> {
         let num_lit = self.num_lit as usize;
-        let lit = try!(DynHuffman16::new(&self.result[..num_lit]));
-        let dist = try!(DynHuffman16::new(&self.result[num_lit..]));
+        let lit = DynHuffman16::new(&self.result[..num_lit])?;
+        let dist = DynHuffman16::new(&self.result[num_lit..])?;
         Ok((lit, dist))
     }
 }
@@ -687,7 +685,7 @@ impl InflateStream {
         }));
         macro_rules! run_len_dist (($len:expr, $dist:expr => ($bytes:expr, $next:expr, $state:expr)) => ({
             let dist = $dist;
-            let left = try!(self.run_len_dist($len, dist));
+            let left = self.run_len_dist($len, dist)?;
             if let Some(len) = left {
                 return ok_bytes!($bytes, LenDist(($next, $state), len, dist));
             }
@@ -852,13 +850,13 @@ impl InflateStream {
                         if i < hclen - 1 {
                             ok!(BlockDynClenCodeLengths(hlit, hdist, hclen, i + 1, clens))
                         } else {
-                            ok!(BlockDynCodeLengths(try!(CodeLengthReader::new(clens, hlit as u16 + 256, hdist))))
+                            ok!(BlockDynCodeLengths(CodeLengthReader::new(clens, hlit as u16 + 256, hdist)?))
                         }
                     }
                     BlockDynCodeLengths(mut reader) => {
-                        let finished = try!(reader.read(&mut stream));
+                        let finished = reader.read(&mut stream)?;
                         if finished {
-                            let (lit, dist) = try!(reader.to_lit_and_dist());
+                            let (lit, dist) = reader.to_lit_and_dist()?;
                             ok!(BlockDyn(lit, dist, 0))
                         } else {
                             ok!(BlockDynCodeLengths(reader))
@@ -872,7 +870,7 @@ impl InflateStream {
                                 prev_len = 0;
                                 len
                             } else {
-                                let (save, code16) = match try!(huff_lit_len.read(&mut stream)) {
+                                let (save, code16) = match huff_lit_len.read(&mut stream)? {
                                     Some(data) => data,
                                     None => return ok!(next!(0)),
                                 };
@@ -918,7 +916,7 @@ impl InflateStream {
                                 }
                             };
 
-                            let (save, dist_code) = match try!(huff_dist.read(&mut stream)) {
+                            let (save, dist_code) = match huff_dist.read(&mut stream)? {
                                 Some(data) => data,
                                 None => return ok!(next!(len)),
                             };
@@ -1024,7 +1022,7 @@ impl InflateStream {
         self.checksum.update(output);
         // and validate if we are done decoding.
         if let Some(c) = self.read_checksum {
-            try!(self.checksum.check(c));
+            self.checksum.check(c)?;
         }
 
         Ok((original_size - data.len(), output))
