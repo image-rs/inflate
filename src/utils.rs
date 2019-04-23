@@ -17,7 +17,7 @@ fn inflate(inflater: &mut InflateStream, data: &[u8]) -> Result<Vec<u8>, String>
 
     let mut n = 0;
     loop {
-        let (num_bytes_read, bytes) = try!(inflater.update(&data[n..]));
+        let (num_bytes_read, bytes) = inflater.update(&data[n..])?;
         if bytes.len() == 0 {
             break;
         }

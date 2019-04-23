@@ -34,7 +34,7 @@ impl<W: Write> InflateWriter<W> {
     }
 
     pub fn finish(mut self) -> io::Result<W> {
-        try!(self.flush());
+        self.flush()?;
         Ok(self.writer)
     }
 }
@@ -49,16 +49,16 @@ impl<W: Write> Write for InflateWriter<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let mut n = 0;
         while n < buf.len() {
-            let (num_bytes_read, result) = try!(update(&mut self.inflater, &buf[n..]));
+            let (num_bytes_read, result) = update(&mut self.inflater, &buf[n..])?;
             n += num_bytes_read;
-            try!(self.writer.write(result));
+            self.writer.write(result)?;
         }
         Ok(n)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        let (_, result) = try!(update(&mut self.inflater, &[]));
-        try!(self.writer.write(result));
+        let (_, result) = update(&mut self.inflater, &[])?;
+        self.writer.write(result)?;
         Ok(())
     }
 }
