@@ -1,14 +1,7 @@
-use std::io::{self, BufRead, Read, BufReader, Error, ErrorKind, Write};
+use std::io::{self, BufRead, Read, BufReader, Error, ErrorKind};
 use std::{cmp,mem};
 
 use super::InflateStream;
-
-/// Workaround for lack of copy_from_slice on pre-1.9 rust.
-#[inline]
-fn copy_from_slice(mut to: &mut [u8], from: &[u8]) {
-    assert_eq!(to.len(), from.len());
-    to.write_all(from).unwrap();
-}
 
 /// A DEFLATE decoder/decompressor.
 ///
@@ -161,7 +154,7 @@ impl<R: BufRead> Read for DeflateDecoderBuf<R> {
             let pending_data =
                 &self.decompressor.buffer[start..
                                           start + bytes_to_copy];
-            copy_from_slice(&mut buf[..bytes_to_copy],pending_data);
+            buf[..bytes_to_copy].copy_from_slice(pending_data);
             bytes_out += bytes_to_copy;
             // This won't underflow since `bytes_to_copy` will be at most
             // the same value as `pending_output_bytes`.
@@ -192,9 +185,7 @@ impl<R: BufRead> Read for DeflateDecoderBuf<R> {
             // Space left in `buf`
             let space_left = buf.len() - bytes_out;
             let bytes_to_copy = cmp::min(space_left, data.len());
-
-            copy_from_slice(&mut buf[bytes_out..bytes_out + bytes_to_copy], &data[..bytes_to_copy]);
-
+            buf[bytes_out..bytes_out + bytes_to_copy].copy_from_slice(&data[..bytes_to_copy]);
             bytes_out += bytes_to_copy;
 
             // Can't underflow as bytes_to_copy is bounded by data.len().
