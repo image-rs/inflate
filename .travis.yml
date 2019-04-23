@@ -1,6 +1,6 @@
 language: rust
 rust:
-  - 1.0.0
+  - 1.24.1
   - stable
   - nightly
 script: cargo test -v
