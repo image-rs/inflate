@@ -22,7 +22,7 @@ fn inflate(inflater: &mut InflateStream, data: &[u8]) -> Result<Vec<u8>, String>
             break;
         }
         n += num_bytes_read;
-        decoded.extend(bytes.iter().map(|v| *v));
+        decoded.extend_from_slice(bytes);
     }
 
     Ok(decoded)
