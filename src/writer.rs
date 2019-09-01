@@ -42,7 +42,7 @@ impl<W: Write> InflateWriter<W> {
 fn update<'a>(inflater: &'a mut InflateStream, buf: &[u8]) -> io::Result<(usize, &'a [u8])>  {
     match inflater.update(buf) {
         Ok(res) => Ok(res),
-        Err(m) => return Err(Error::new(ErrorKind::Other, m)),
+        Err(m) => Err(Error::new(ErrorKind::Other, m)),
     }
 }
 impl<W: Write> Write for InflateWriter<W> {
@@ -51,14 +51,14 @@ impl<W: Write> Write for InflateWriter<W> {
         while n < buf.len() {
             let (num_bytes_read, result) = update(&mut self.inflater, &buf[n..])?;
             n += num_bytes_read;
-            self.writer.write(result)?;
+            self.writer.write_all(result)?;
         }
         Ok(n)
     }
 
     fn flush(&mut self) -> io::Result<()> {
         let (_, result) = update(&mut self.inflater, &[])?;
-        self.writer.write(result)?;
+        self.writer.write_all(result)?;
         Ok(())
     }
 }

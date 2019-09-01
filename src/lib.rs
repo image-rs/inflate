@@ -190,14 +190,14 @@ impl<'a> BitStream<'a> {
         BitStream {
             bytes: bytes.iter(),
             used: 0,
-            state: state,
+            state,
         }
     }
 
     fn use_byte(&mut self) -> bool {
         match self.bytes.next() {
             Some(&b) => {
-                self.state.v |= (b as u32) << self.state.n;
+                self.state.v |= u32::from(b) << self.state.n;
                 self.state.n += 8;
                 self.used += 1;
                 true
@@ -335,11 +335,11 @@ impl CodeLengthReader {
         });
 
         Ok(CodeLengthReader {
-            patterns: patterns,
-            clens: clens,
+            patterns,
+            clens,
             result: Vec::with_capacity(num_lit as usize + num_dist as usize),
-            num_lit: num_lit,
-            num_dist: num_dist,
+            num_lit,
+            num_dist,
         })
     }
 
@@ -363,7 +363,7 @@ impl CodeLengthReader {
                 None => return Err("invalid length code".to_owned()),
             });
             match code {
-                0...15 => self.result.push(code),
+                0..=15 => self.result.push(code),
                 16 => {
                     let last = match self.result.last() {
                         Some(&v) => v,
@@ -415,7 +415,7 @@ impl DynHuffman16 {
         let mut patterns = Box::new([0xffffu16; 256]);
         let mut rest = Vec::new();
         with_codes!(clens, 15 => u16, |i: u16, code: u16, bits: u8| -> _ {
-            let entry = i | ((bits as u16) << 12);
+            let entry = i | (u16::from(bits) << 12);
             if bits <= 8 {
                 let base = match BIT_REV_U8.get((code << (8 - bits)) as usize) {
                     Some(&v) => v,
@@ -445,7 +445,7 @@ impl DynHuffman16 {
                     });
                     (bits, (rest.len() - 1) as u16)
                 };
-                patterns[low as usize] = idx | 0x800 | ((min_bits as u16) << 12);
+                patterns[low as usize] = idx | 0x800 | (u16::from(min_bits) << 12);
                 let trie_entry = match rest.get_mut(idx as usize) {
                     Some(v) => v,
                     None => return Err("invalid huffman code".to_owned())
@@ -474,8 +474,8 @@ impl DynHuffman16 {
         }
         debug!("===================");
         Ok(DynHuffman16 {
-            patterns: patterns,
-            rest: rest,
+            patterns,
+            rest,
         })
     }
 
@@ -594,11 +594,11 @@ impl InflateStream {
     fn with_state_and_buffer(state: State, buffer: Vec<u8>, checksum: Checksum)
                              -> InflateStream {
         InflateStream {
-            buffer: buffer,
+            buffer,
             pos: 0,
             state: Some(state),
             final_block: false,
-            checksum: checksum,
+            checksum,
             read_checksum: None,
         }
     }
@@ -727,7 +727,7 @@ impl InflateStream {
                 let (_check, dict, _level) = (b & 0x1F, (b & 0x20) != 0, b >> 6);
                 debug!("ZLIB FCHECK=0x{:x} FDICT={} FLEVEL=0x{:x}", _check, dict, _level);
 
-                if (((cmf as u16) << 8) | b as u16) % 31 != 0 {
+                if (((u16::from(cmf)) << 8) | u16::from(b)) % 31 != 0 {
                     return Err(format!("invalid ZLIB checksum CMF=0x{:x} FLG=0x{:x}", cmf, b));
                 }
 
@@ -850,7 +850,7 @@ impl InflateStream {
                         if i < hclen - 1 {
                             ok!(BlockDynClenCodeLengths(hlit, hdist, hclen, i + 1, clens))
                         } else {
-                            ok!(BlockDynCodeLengths(CodeLengthReader::new(clens, hlit as u16 + 256, hdist)?))
+                            ok!(BlockDynCodeLengths(CodeLengthReader::new(clens, u16::from(hlit) + 256, hdist)?))
                         }
                     }
                     BlockDynCodeLengths(mut reader) => {
@@ -877,11 +877,11 @@ impl InflateStream {
                                 let code = code16 as u8;
                                 debug!("{:09b}", code16);
                                 match code16 {
-                                    0...255 => {
+                                    0..=255 => {
                                         push_or!(code, ok!({stream = save; next!(0)}));
                                         continue;
                                     }
-                                    256...285 => {}
+                                    256..=285 => {}
                                     _ => return Err(format!("bad DEFLATE len code {}", code)),
                                 }
 
@@ -905,14 +905,14 @@ impl InflateStream {
                                             ok!(BlockHeader)
                                         }
                                     }
-                                    1...8 => len!(code, 0),
-                                    9...12 => len!(code, 1),
-                                    13...16 => len!(code, 2),
-                                    17...20 => len!(code, 3),
-                                    21...24 => len!(code, 4),
-                                    25...28 => len!(code, 5),
+                                    1..=8 => len!(code, 0),
+                                    9..=12 => len!(code, 1),
+                                    13..=16 => len!(code, 2),
+                                    17..=20 => len!(code, 3),
+                                    21..=24 => len!(code, 4),
+                                    25..=28 => len!(code, 5),
                                     29 => len!(29, 0),
-                                    _ => return Err(format!("bad DEFLATE len code {}", code as u16 + 256)),
+                                    _ => return Err(format!("bad DEFLATE len code {}", u16::from(code) + 256)),
                                 }
                             };
 
@@ -925,20 +925,20 @@ impl InflateStream {
                                 len_dist!(len, dist_code, $bits => {stream = save; next!(len)}, next!(0))
                             ));
                             match dist_code {
-                                0...3 => len_dist_case!(0),
-                                4...5 => len_dist_case!(1),
-                                6...7 => len_dist_case!(2),
-                                8...9 => len_dist_case!(3),
-                                10...11 => len_dist_case!(4),
-                                12...13 => len_dist_case!(5),
-                                14...15 => len_dist_case!(6),
-                                16...17 => len_dist_case!(7),
-                                18...19 => len_dist_case!(8),
-                                20...21 => len_dist_case!(9),
-                                22...23 => len_dist_case!(10),
-                                24...25 => len_dist_case!(11),
-                                26...27 => len_dist_case!(12),
-                                28...29 => len_dist_case!(13),
+                                0..=3 => len_dist_case!(0),
+                                4..=5 => len_dist_case!(1),
+                                6..=7 => len_dist_case!(2),
+                                8..=9 => len_dist_case!(3),
+                                10..=11 => len_dist_case!(4),
+                                12..=13 => len_dist_case!(5),
+                                14..=15 => len_dist_case!(6),
+                                16..=17 => len_dist_case!(7),
+                                18..=19 => len_dist_case!(8),
+                                20..=21 => len_dist_case!(9),
+                                22..=23 => len_dist_case!(10),
+                                24..=25 => len_dist_case!(11),
+                                26..=27 => len_dist_case!(12),
+                                28..=29 => len_dist_case!(13),
                                 _ => return Err(format!("bad DEFLATE dist code {}", dist_code)),
                             }
                         }
