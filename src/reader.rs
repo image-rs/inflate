@@ -39,7 +39,7 @@ impl<R: BufRead> DeflateDecoderBuf<R> {
     /// Create a new `Deflatedecoderbuf` to read from a raw deflate stream.
     pub fn new(reader: R) -> DeflateDecoderBuf<R> {
         DeflateDecoderBuf {
-            reader: reader,
+            reader,
             decompressor: InflateStream::new(),
             pending_output_bytes: 0,
             total_in: 0,
@@ -50,7 +50,7 @@ impl<R: BufRead> DeflateDecoderBuf<R> {
     /// Create a new `DeflateDecoderbuf` that reads from a zlib wrapped deflate stream.
     pub fn from_zlib(reader: R) -> DeflateDecoderBuf<R> {
         DeflateDecoderBuf {
-            reader: reader,
+            reader,
             decompressor: InflateStream::from_zlib(),
             pending_output_bytes: 0,
             total_in: 0,
@@ -62,7 +62,7 @@ impl<R: BufRead> DeflateDecoderBuf<R> {
     /// without calculating and validating the checksum.
     pub fn from_zlib_no_checksum(reader: R) -> DeflateDecoderBuf<R> {
         DeflateDecoderBuf {
-            reader: reader,
+            reader,
             decompressor: InflateStream::from_zlib_no_checksum(),
             pending_output_bytes: 0,
             total_in: 0,
@@ -171,7 +171,7 @@ impl<R: BufRead> Read for DeflateDecoderBuf<R> {
         let (input_bytes_read, remaining_bytes) = {
             self.pending_output_bytes = 0;
             let input = self.reader.fill_buf()?;
-            if input.len() == 0 {
+            if input.is_empty() {
                 self.total_out += bytes_out as u64;
                 //If there is nothing more to read, return.
                 return Ok(bytes_out);
