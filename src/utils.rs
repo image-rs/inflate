@@ -9,7 +9,7 @@
 /// let decoded = inflate_bytes(&encoded).unwrap();
 /// println!("{}", from_utf8(&decoded).unwrap()); // prints "Hello, world"
 /// ```
-use InflateStream;
+use crate::InflateStream;
 
 fn inflate(inflater: &mut InflateStream, data: &[u8]) -> Result<Vec<u8>, String> {
     let mut decoded = Vec::<u8>::new();

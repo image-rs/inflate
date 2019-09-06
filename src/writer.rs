@@ -1,6 +1,6 @@
 use std::io;
 use std::io::{Error, ErrorKind, Write};
-use InflateStream;
+use crate::InflateStream;
 
 /// A DEFLATE decoder.
 ///

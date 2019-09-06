@@ -71,7 +71,7 @@ use std::cmp;
 use std::slice;
 
 mod checksum;
-use checksum::{adler32_from_bytes, Checksum};
+use self::checksum::{adler32_from_bytes, Checksum};
 
 mod writer;
 pub use self::writer::InflateWriter;
