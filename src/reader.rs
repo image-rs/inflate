@@ -1,5 +1,5 @@
-use std::io::{self, BufRead, Read, BufReader, Error, ErrorKind};
-use std::{cmp,mem};
+use std::io::{self, BufRead, BufReader, Error, ErrorKind, Read};
+use std::{cmp, mem};
 
 use super::InflateStream;
 
@@ -151,9 +151,7 @@ impl<R: BufRead> Read for DeflateDecoderBuf<R> {
 
             // Copy as much decompressed as possible to buf.
             let bytes_to_copy = cmp::min(buf.len(), self.pending_output_bytes);
-            let pending_data =
-                &self.decompressor.buffer[start..
-                                          start + bytes_to_copy];
+            let pending_data = &self.decompressor.buffer[start..start + bytes_to_copy];
             buf[..bytes_to_copy].copy_from_slice(pending_data);
             bytes_out += bytes_to_copy;
             // This won't underflow since `bytes_to_copy` will be at most
@@ -176,11 +174,10 @@ impl<R: BufRead> Read for DeflateDecoderBuf<R> {
                 //If there is nothing more to read, return.
                 return Ok(bytes_out);
             }
-            let (input_bytes_read, data) =
-                match self.decompressor.update(&input) {
-                    Ok(res) => res,
-                    Err(m) => return Err(Error::new(ErrorKind::Other, m))
-                };
+            let (input_bytes_read, data) = match self.decompressor.update(&input) {
+                Ok(res) => res,
+                Err(m) => return Err(Error::new(ErrorKind::Other, m)),
+            };
 
             // Space left in `buf`
             let space_left = buf.len() - bytes_out;
@@ -190,7 +187,6 @@ impl<R: BufRead> Read for DeflateDecoderBuf<R> {
 
             // Can't underflow as bytes_to_copy is bounded by data.len().
             (input_bytes_read, data.len() - bytes_to_copy)
-
         };
 
         self.pending_output_bytes += remaining_bytes;
@@ -201,8 +197,6 @@ impl<R: BufRead> Read for DeflateDecoderBuf<R> {
         Ok(bytes_out)
     }
 }
-
-
 
 /// A DEFLATE decoder/decompressor.
 ///
@@ -223,21 +217,21 @@ impl<R: BufRead> Read for DeflateDecoderBuf<R> {
 /// ```
 pub struct DeflateDecoder<R> {
     /// Inner DeflateDecoderBuf, with R wrapped in a `BufReader`.
-    inner: DeflateDecoderBuf<BufReader<R>>
+    inner: DeflateDecoderBuf<BufReader<R>>,
 }
 
 impl<R: Read> DeflateDecoder<R> {
     /// Create a new `Deflatedecoderbuf` to read from a raw deflate stream.
     pub fn new(reader: R) -> DeflateDecoder<R> {
         DeflateDecoder {
-            inner: DeflateDecoderBuf::new(BufReader::new(reader))
+            inner: DeflateDecoderBuf::new(BufReader::new(reader)),
         }
     }
 
     /// Create a new `DeflateDecoderbuf` that reads from a zlib wrapped deflate stream.
     pub fn from_zlib(reader: R) -> DeflateDecoder<R> {
         DeflateDecoder {
-            inner: DeflateDecoderBuf::from_zlib(BufReader::new(reader))
+            inner: DeflateDecoderBuf::from_zlib(BufReader::new(reader)),
         }
     }
 
@@ -245,7 +239,7 @@ impl<R: Read> DeflateDecoder<R> {
     /// without calculating and validating the checksum.
     pub fn from_zlib_no_checksum(reader: R) -> DeflateDecoder<R> {
         DeflateDecoder {
-            inner: DeflateDecoderBuf::from_zlib_no_checksum(BufReader::new(reader))
+            inner: DeflateDecoderBuf::from_zlib_no_checksum(BufReader::new(reader)),
         }
     }
 
@@ -319,7 +313,7 @@ impl<R: Read> Read for DeflateDecoder<R> {
 
 #[cfg(test)]
 mod test {
-    use super::{DeflateDecoder};
+    use super::DeflateDecoder;
     use std::io::Read;
 
     #[test]
@@ -337,8 +331,9 @@ mod test {
     #[test]
     fn zlib_reader() {
         const TEST_STRING: &'static str = "Hello, zlib!";
-        let encoded = vec![120, 156, 243, 72, 205, 201, 201, 215, 81, 168, 202, 201,
-                       76, 82, 4, 0, 27, 101, 4, 19];
+        let encoded = vec![
+            120, 156, 243, 72, 205, 201, 201, 215, 81, 168, 202, 201, 76, 82, 4, 0, 27, 101, 4, 19,
+        ];
         let mut decoder = DeflateDecoder::from_zlib(&encoded[..]);
         let mut output = Vec::new();
         decoder.read_to_end(&mut output).unwrap();

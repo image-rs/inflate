@@ -71,10 +71,10 @@ use std::cmp;
 use std::slice;
 
 mod checksum;
-use checksum::{Checksum, adler32_from_bytes};
+use checksum::{adler32_from_bytes, Checksum};
 
 mod writer;
-pub use self::writer::{InflateWriter};
+pub use self::writer::InflateWriter;
 
 mod utils;
 pub use self::utils::{inflate_bytes, inflate_bytes_zlib, inflate_bytes_zlib_no_checksum};
@@ -82,6 +82,7 @@ pub use self::utils::{inflate_bytes, inflate_bytes_zlib, inflate_bytes_zlib_no_c
 mod reader;
 pub use self::reader::{DeflateDecoder, DeflateDecoderBuf};
 
+#[rustfmt::skip]
 static BIT_REV_U8: [u8; 256] = [
     0b0000_0000, 0b1000_0000, 0b0100_0000, 0b1100_0000,
     0b0010_0000, 0b1010_0000, 0b0110_0000, 0b1110_0000,
@@ -183,7 +184,11 @@ struct BitStream<'a> {
 #[cfg(debug)]
 macro_rules! debug { ($($x:tt)*) => (println!($($x)*)) }
 #[cfg(not(debug))]
-macro_rules! debug { ($($x:tt)*) => (()) }
+macro_rules! debug {
+    ($($x:tt)*) => {
+        ()
+    };
+}
 
 impl<'a> BitStream<'a> {
     fn new(bytes: &'a [u8], state: BitState) -> BitStream<'a> {
@@ -473,10 +478,7 @@ impl DynHuffman16 {
             debug!("{:08b} {:04x}", _i, patterns[BIT_REV_U8[_i] as usize]);
         }
         debug!("===================");
-        Ok(DynHuffman16 {
-            patterns,
-            rest,
-        })
+        Ok(DynHuffman16 { patterns, rest })
     }
 
     fn read<'a>(&self, stream: &mut BitStream<'a>) -> Result<Option<(BitStream<'a>, u16)>, String> {
@@ -523,13 +525,17 @@ impl DynHuffman16 {
 }
 
 enum State {
-    ZlibMethodAndFlags, // CMF
+    ZlibMethodAndFlags,      // CMF
     ZlibFlags(/* CMF */ u8), // FLG,
     Bits(BitsNext, BitState),
-    LenDist((BitsNext, BitState), /* len */ u16, /* dist */ u16),
+    LenDist(
+        (BitsNext, BitState),
+        /* len */ u16,
+        /* dist */ u16,
+    ),
     Uncompressed(/* len */ u16),
     CheckCRC(/* len */ u8, /* bytes */ [u8; 4]),
-    Finished
+    Finished,
 }
 
 use self::State::*;
@@ -541,9 +547,19 @@ enum BitsNext {
     BlockDynHlit,
     BlockDynHdist(/* hlit */ u8),
     BlockDynHclen(/* hlit */ u8, /* hdist */ u8),
-    BlockDynClenCodeLengths(/* hlit */ u8, /* hdist */ u8, /* hclen */ u8, /* idx */ u8, /* clens */ Box<[u8; 19]>),
+    BlockDynClenCodeLengths(
+        /* hlit */ u8,
+        /* hdist */ u8,
+        /* hclen */ u8,
+        /* idx */ u8,
+        /* clens */ Box<[u8; 19]>,
+    ),
     BlockDynCodeLengths(CodeLengthReader),
-    BlockDyn(/* lit/len */ DynHuffman16, /* dist */ DynHuffman16, /* prev_len */ u16)
+    BlockDyn(
+        /* lit/len */ DynHuffman16,
+        /* dist */ DynHuffman16,
+        /* prev_len */ u16,
+    ),
 }
 
 use self::BitsNext::*;
@@ -591,8 +607,7 @@ impl InflateStream {
         self.state = Some(ZlibMethodAndFlags);
     }
 
-    fn with_state_and_buffer(state: State, buffer: Vec<u8>, checksum: Checksum)
-                             -> InflateStream {
+    fn with_state_and_buffer(state: State, buffer: Vec<u8>, checksum: Checksum) -> InflateStream {
         InflateStream {
             buffer,
             pos: 0,
@@ -604,8 +619,13 @@ impl InflateStream {
     }
 
     fn run_len_dist(&mut self, len: u16, dist: u16) -> Result<Option<u16>, String> {
-        debug!("RLE -{}; {} (cap={} len={})", dist, len,
-               self.buffer.capacity(), self.buffer.len());
+        debug!(
+            "RLE -{}; {} (cap={} len={})",
+            dist,
+            len,
+            self.buffer.capacity(),
+            self.buffer.len()
+        );
         if dist < 1 {
             return Err("invalid run length in stream".to_owned());
         }
@@ -704,8 +724,8 @@ impl InflateStream {
 
                 // CM = 8 (DEFLATE) is the only method defined by the ZLIB specification.
                 match method {
-                    8 => {/* DEFLATE */}
-                    _ => return Err(format!("unknown ZLIB method CM=0x{:x}", method))
+                    8 => { /* DEFLATE */ }
+                    _ => return Err(format!("unknown ZLIB method CM=0x{:x}", method)),
                 }
 
                 if info > 7 {
@@ -725,10 +745,16 @@ impl InflateStream {
                     }
                 };
                 let (_check, dict, _level) = (b & 0x1F, (b & 0x20) != 0, b >> 6);
-                debug!("ZLIB FCHECK=0x{:x} FDICT={} FLEVEL=0x{:x}", _check, dict, _level);
+                debug!(
+                    "ZLIB FCHECK=0x{:x} FDICT={} FLEVEL=0x{:x}",
+                    _check, dict, _level
+                );
 
                 if (((u16::from(cmf)) << 8) | u16::from(b)) % 31 != 0 {
-                    return Err(format!("invalid ZLIB checksum CMF=0x{:x} FLG=0x{:x}", cmf, b));
+                    return Err(format!(
+                        "invalid ZLIB checksum CMF=0x{:x} FLG=0x{:x}",
+                        cmf, b
+                    ));
                 }
 
                 if dict {
@@ -807,7 +833,10 @@ impl InflateStream {
                                     7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, // 256-271
                                     7, 7, 7, 7, 7, 7, 7, 7, // 272-279
                                     8, 8, 8, 8, 8, 8, 8, 8, // 280-287
-                                ]).unwrap();
+                                ])
+                                .unwrap();
+
+                                #[rustfmt::skip]
                                 let dist = DynHuffman16::new(&[
                                     5, 5, 5, 5, 5, 5, 5, 5,
                                     5, 5, 5, 5, 5, 5, 5, 5,
@@ -817,10 +846,10 @@ impl InflateStream {
                                 ok!(BlockDyn(lit, dist, 0))
                             }
                             2 => ok!(BlockDynHlit),
-                            _ => {
-                                Err(format!("unimplemented DEFLATE block type 0b{:?}",
-                                             block_type))
-                            }
+                            _ => Err(format!(
+                                "unimplemented DEFLATE block type 0b{:?}",
+                                block_type
+                            )),
                         }
                     }
                     BlockUncompressedLen => {
@@ -831,26 +860,40 @@ impl InflateStream {
                         let nlen = take16!(16);
                         assert_eq!(stream.state.n, 0);
                         if !len != nlen {
-                            return Err(format!("invalid uncompressed block len: LEN: {:04x} NLEN: {:04x}", len, nlen));
+                            return Err(format!(
+                                "invalid uncompressed block len: LEN: {:04x} NLEN: {:04x}",
+                                len, nlen
+                            ));
                         }
                         ok_state!(Uncompressed(len))
                     }
                     BlockDynHlit => ok!(BlockDynHdist(take!(5) + 1)),
                     BlockDynHdist(hlit) => ok!(BlockDynHclen(hlit, take!(5) + 1)),
-                    BlockDynHclen(hlit, hdist) => {
-                        ok!(BlockDynClenCodeLengths(hlit, hdist, take!(4) + 4, 0, Box::new([0; 19])))
-                    }
+                    BlockDynHclen(hlit, hdist) => ok!(BlockDynClenCodeLengths(
+                        hlit,
+                        hdist,
+                        take!(4) + 4,
+                        0,
+                        Box::new([0; 19])
+                    )),
                     BlockDynClenCodeLengths(hlit, hdist, hclen, i, mut clens) => {
-                        let v =
-                            match stream.take(3) {
-                                Some(v) => v,
-                                None => return ok!(BlockDynClenCodeLengths(hlit, hdist, hclen, i, clens)),
-                            };
-                        clens[[16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15][i as usize]] = v;
+                        let v = match stream.take(3) {
+                            Some(v) => v,
+                            None => {
+                                return ok!(BlockDynClenCodeLengths(hlit, hdist, hclen, i, clens))
+                            }
+                        };
+                        clens[[
+                            16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15,
+                        ][i as usize]] = v;
                         if i < hclen - 1 {
                             ok!(BlockDynClenCodeLengths(hlit, hdist, hclen, i + 1, clens))
                         } else {
-                            ok!(BlockDynCodeLengths(CodeLengthReader::new(clens, u16::from(hlit) + 256, hdist)?))
+                            ok!(BlockDynCodeLengths(CodeLengthReader::new(
+                                clens,
+                                u16::from(hlit) + 256,
+                                hdist
+                            )?))
                         }
                     }
                     BlockDynCodeLengths(mut reader) => {
@@ -878,7 +921,13 @@ impl InflateStream {
                                 debug!("{:09b}", code16);
                                 match code16 {
                                     0..=255 => {
-                                        push_or!(code, ok!({stream = save; next!(0)}));
+                                        push_or!(
+                                            code,
+                                            ok!({
+                                                stream = save;
+                                                next!(0)
+                                            })
+                                        );
                                         continue;
                                     }
                                     256..=285 => {}
@@ -912,7 +961,12 @@ impl InflateStream {
                                     21..=24 => len!(code, 4),
                                     25..=28 => len!(code, 5),
                                     29 => len!(29, 0),
-                                    _ => return Err(format!("bad DEFLATE len code {}", u16::from(code) + 256)),
+                                    _ => {
+                                        return Err(format!(
+                                            "bad DEFLATE len code {}",
+                                            u16::from(code) + 256
+                                        ))
+                                    }
                                 }
                             };
 
@@ -1002,8 +1056,9 @@ impl InflateStream {
         let original_size = data.len();
         let original_pos = self.pos as usize;
         let mut empty = false;
-        while !empty &&
-              ((self.pos as usize) < self.buffer.capacity() || self.buffer.capacity() == 0) {
+        while !empty
+            && ((self.pos as usize) < self.buffer.capacity() || self.buffer.capacity() == 0)
+        {
             // next_state must be called at least once after the data is empty.
             empty = data.is_empty();
             match self.next_state(data) {

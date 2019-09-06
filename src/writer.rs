@@ -1,5 +1,5 @@
-use std::io::{Write, Error, ErrorKind};
 use std::io;
+use std::io::{Error, ErrorKind, Write};
 use InflateStream;
 
 /// A DEFLATE decoder.
@@ -21,16 +21,22 @@ use InflateStream;
 /// ```
 pub struct InflateWriter<W: Write> {
     inflater: InflateStream,
-    writer: W
+    writer: W,
 }
 
 impl<W: Write> InflateWriter<W> {
     pub fn new(w: W) -> InflateWriter<W> {
-        InflateWriter { inflater: InflateStream::new(), writer: w }
+        InflateWriter {
+            inflater: InflateStream::new(),
+            writer: w,
+        }
     }
 
     pub fn from_zlib(w: W) -> InflateWriter<W> {
-        InflateWriter { inflater: InflateStream::from_zlib(), writer: w }
+        InflateWriter {
+            inflater: InflateStream::from_zlib(),
+            writer: w,
+        }
     }
 
     pub fn finish(mut self) -> io::Result<W> {
@@ -39,7 +45,7 @@ impl<W: Write> InflateWriter<W> {
     }
 }
 
-fn update<'a>(inflater: &'a mut InflateStream, buf: &[u8]) -> io::Result<(usize, &'a [u8])>  {
+fn update<'a>(inflater: &'a mut InflateStream, buf: &[u8]) -> io::Result<(usize, &'a [u8])> {
     match inflater.update(buf) {
         Ok(res) => Ok(res),
         Err(m) => Err(Error::new(ErrorKind::Other, m)),
@@ -70,19 +76,21 @@ mod test {
 
     #[test]
     fn inflate_writer() {
-       let encoded = [243, 72, 205, 201, 201, 215, 81, 40, 207, 47, 202, 73, 1, 0];
-       let mut decoder = InflateWriter::new(Vec::new());
-       decoder.write(&encoded).unwrap();
-       let decoded = decoder.finish().unwrap();
-       assert!(String::from_utf8(decoded).unwrap() == "Hello, world");
+        let encoded = [243, 72, 205, 201, 201, 215, 81, 40, 207, 47, 202, 73, 1, 0];
+        let mut decoder = InflateWriter::new(Vec::new());
+        decoder.write(&encoded).unwrap();
+        let decoded = decoder.finish().unwrap();
+        assert!(String::from_utf8(decoded).unwrap() == "Hello, world");
     }
 
     #[test]
     fn inflate_writer_from_zlib() {
-       let encoded = [120, 156, 243, 72, 205, 201, 201, 215, 81, 168, 202, 201, 76, 82, 4, 0, 27, 101, 4, 19];
-       let mut decoder = InflateWriter::from_zlib(Vec::new());
-       decoder.write(&encoded).unwrap();
-       let decoded = decoder.finish().unwrap();
-       assert!(String::from_utf8(decoded).unwrap() == "Hello, zlib!");
+        let encoded = [
+            120, 156, 243, 72, 205, 201, 201, 215, 81, 168, 202, 201, 76, 82, 4, 0, 27, 101, 4, 19,
+        ];
+        let mut decoder = InflateWriter::from_zlib(Vec::new());
+        decoder.write(&encoded).unwrap();
+        let decoded = decoder.finish().unwrap();
+        assert!(String::from_utf8(decoded).unwrap() == "Hello, zlib!");
     }
 }
